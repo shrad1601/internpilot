@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+*.pyi
+
+# Node / Extension
+node_modules/
+extension/dist/
+.pnpm-store/
+
+# Runtime data
+data/
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+*.swp
+
+# IDE
+.vscode/
+.idea/

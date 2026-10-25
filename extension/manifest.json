@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "name": "InternPilot",
+  "version": "0.1.0",
+  "description": "Human-in-the-loop job application copilot",
+  "permissions": ["sidePanel", "storage", "activeTab", "scripting", "tabs"],
+  "host_permissions": ["<all_urls>", "http://127.0.0.1:8765/*"],
+  "background": {
+    "service_worker": "src/background/index.ts",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/index.ts"],
+      "all_frames": true,
+      "match_about_blank": true,
+      "run_at": "document_idle"
+    }
+  ],
+  "side_panel": {
+    "default_path": "src/sidepanel/index.html"
+  },
+  "action": {
+    "default_title": "InternPilot"
+  },
+  "commands": {
+    "activate": {
+      "suggested_key": {
+        "mac": "Command+Shift+Y",
+        "default": "Ctrl+Shift+Y"
+      },
+      "description": "Activate InternPilot"
+    },
+    "stop": {
+      "suggested_key": {
+        "mac": "Command+Shift+Period",
+        "default": "Ctrl+Shift+Period"
+      },
+      "description": "Stop current run"
+    }
+  }
+}
