@@ -1,117 +1,215 @@
-import type { PageSnapshot, Field } from '../../shared/types'
+import type { PageSnapshot, ProposedAction, StepEntry, RunStatus, Field } from '../../shared/types'
+import ApprovalCard from '../components/ApprovalCard'
+import StepLog from '../components/StepLog'
+import StopButton from '../components/StopButton'
 
 interface Props {
-  status: 'idle' | 'reading' | 'ready' | 'error'
+  runStatus: RunStatus
   snapshot: PageSnapshot | null
+  actions: ProposedAction[]
+  currentIdx: number
+  steps: StepEntry[]
   serverConnected: boolean
   error?: string
   onActivate: () => void
+  onStop: () => void
+  onApprove: (idx: number, editedValue?: string) => void
+  onReject: (idx: number) => void
+  onAnswer: (idx: number, value: string, remember: boolean) => void
 }
 
-export default function Run({ status, snapshot, serverConnected, error, onActivate }: Props) {
-  if (status === 'reading') {
+export default function Run({
+  runStatus, snapshot, actions, currentIdx, steps,
+  serverConnected, error, onActivate, onStop,
+  onApprove, onReject, onAnswer,
+}: Props) {
+  const isActive = runStatus !== 'idle' && runStatus !== 'done' && runStatus !== 'stopped' && runStatus !== 'error'
+  const currentAction = actions[currentIdx]
+
+  // ── Idle ───────────────────────────────────────────────────────────────────
+  if (runStatus === 'idle' || (!snapshot && !isActive)) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 gap-3 text-gray-500">
-        <Spinner />
-        <p>Reading page…</p>
+      <div className="text-center py-10 space-y-4">
+        {!serverConnected && (
+          <p className="text-amber-600 text-xs">Server offline — start it first.</p>
+        )}
+        <p className="text-gray-500 text-sm">
+          Navigate to a job application page, then press Activate.
+        </p>
+        <button
+          onClick={onActivate}
+          disabled={!serverConnected}
+          className="bg-blue-600 text-white px-6 py-2 rounded-lg text-sm disabled:opacity-40 hover:bg-blue-700 transition-colors"
+        >
+          Activate
+        </button>
+        <p className="text-xs text-gray-400">or press ⌘⇧Y</p>
       </div>
     )
   }
 
-  if (status === 'error') {
+  // ── Reading / planning ─────────────────────────────────────────────────────
+  if (runStatus === 'reading' || runStatus === 'planning') {
+    return (
+      <div className="space-y-4">
+        <StopButton onStop={onStop} />
+        <div className="flex flex-col items-center justify-center py-8 gap-3 text-gray-500">
+          <Spinner />
+          <p>{runStatus === 'reading' ? 'Reading page…' : 'Planning…'}</p>
+        </div>
+        <StepLog steps={steps} />
+      </div>
+    )
+  }
+
+  // ── Error ──────────────────────────────────────────────────────────────────
+  if (runStatus === 'error') {
     return (
       <div className="text-center py-8 space-y-3">
         <p className="text-red-500 text-sm">{error ?? 'Something went wrong'}</p>
         <button onClick={onActivate} className="text-xs text-blue-500 underline">Try again</button>
+        <StepLog steps={steps} />
       </div>
     )
   }
 
-  if (status === 'ready' && snapshot) {
-    const visible = snapshot.fields.filter((f) => f.visible)
-    const sections = groupBySection(visible)
-
+  // ── Done / stopped ─────────────────────────────────────────────────────────
+  if (runStatus === 'done' || runStatus === 'stopped') {
+    const filledCount = steps.filter((s) => s.kind === 'fill' && s.status === 'ok').length
     return (
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-gray-500">
-            Found <strong>{visible.length}</strong> field{visible.length !== 1 ? 's' : ''}
-            {snapshot.atsGuess && snapshot.atsGuess !== 'other'
-              ? ` · ${snapshot.atsGuess}`
-              : ''}
-          </span>
-          <button
-            onClick={onActivate}
-            className="text-xs text-blue-500 underline"
-          >
-            Re-read
-          </button>
+        <div className="text-center py-4 space-y-1">
+          <p className="font-semibold">
+            {runStatus === 'done' ? '✓ Done' : '⏹ Stopped'}
+          </p>
+          <p className="text-xs text-gray-500">{filledCount} field{filledCount !== 1 ? 's' : ''} filled</p>
         </div>
-
-        {snapshot.jobTitle && (
-          <div className="text-xs text-gray-500">
-            <strong>{snapshot.company ?? 'Company'}</strong>
-            {snapshot.company ? ' — ' : ''}{snapshot.jobTitle}
-          </div>
-        )}
-
-        {sections.map(([heading, fields]) => (
-          <SectionBlock key={heading} heading={heading} fields={fields} />
-        ))}
-
-        {visible.length === 0 && (
-          <p className="text-gray-400 text-sm text-center py-4">No form fields detected on this page.</p>
-        )}
+        <button
+          onClick={onActivate}
+          className="w-full text-xs text-blue-500 underline text-center"
+        >
+          Re-run
+        </button>
+        <StepLog steps={steps} />
       </div>
     )
   }
 
-  // idle
+  // ── Active (awaiting_approval / filling) ───────────────────────────────────
+  const progress = actions.length > 0 ? (currentIdx / actions.length) * 100 : 0
+
   return (
-    <div className="text-center py-10 space-y-4">
-      {!serverConnected && (
-        <p className="text-amber-600 text-xs">Server offline — start it first.</p>
+    <div className="space-y-3">
+      <StopButton onStop={onStop} />
+
+      {/* Progress bar */}
+      {actions.length > 0 && (
+        <div className="space-y-1">
+          <div className="flex justify-between text-xs text-gray-400">
+            <span>{currentIdx} of {actions.length}</span>
+            <span>{runStatus === 'filling' ? 'Filling…' : 'Awaiting approval'}</span>
+          </div>
+          <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-blue-500 rounded-full transition-all duration-300"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        </div>
       )}
-      <p className="text-gray-500 text-sm">
-        Navigate to a job application page, then press Activate.
-      </p>
-      <button
-        onClick={onActivate}
-        disabled={!serverConnected}
-        className="bg-blue-600 text-white px-6 py-2 rounded-lg text-sm disabled:opacity-40 hover:bg-blue-700 transition-colors"
-      >
-        Activate
-      </button>
-      <p className="text-xs text-gray-400">or press ⌘⇧Y</p>
+
+      {/* Page info */}
+      {snapshot && (
+        <div className="text-xs text-gray-400">
+          {snapshot.company && <span className="font-medium text-gray-600">{snapshot.company}</span>}
+          {snapshot.company && snapshot.jobTitle && ' — '}
+          {snapshot.jobTitle}
+        </div>
+      )}
+
+      {/* Current action card */}
+      {currentAction && runStatus === 'awaiting_approval' && (
+        <div className="space-y-1">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            Action {currentIdx + 1} of {actions.length}
+          </p>
+          <ApprovalCard
+            key={currentIdx}
+            idx={currentIdx}
+            proposed={currentAction}
+            onApprove={onApprove}
+            onReject={onReject}
+            onAnswer={onAnswer}
+          />
+        </div>
+      )}
+
+      {runStatus === 'filling' && (
+        <div className="flex items-center gap-2 text-xs text-gray-500 py-2">
+          <Spinner small />
+          <span>Filling field…</span>
+        </div>
+      )}
+
+      {/* Field overview when snapshot available */}
+      {snapshot && (
+        <FieldOverview snapshot={snapshot} actions={actions} currentIdx={currentIdx} />
+      )}
+
+      <StepLog steps={steps} />
     </div>
   )
 }
 
-function SectionBlock({ heading, fields }: { heading: string; fields: Field[] }) {
+function FieldOverview({
+  snapshot, actions, currentIdx,
+}: {
+  snapshot: PageSnapshot
+  actions: ProposedAction[]
+  currentIdx: number
+}) {
+  const visible = snapshot.fields.filter((f) => f.visible)
+  if (visible.length === 0) return null
+
+  const actionsByAgentId = new Map(actions.map((a) => [a.action.agentId, a]))
+  const processedSet = new Set(actions.slice(0, currentIdx).map((a) => a.action.agentId))
+
   return (
-    <div className="space-y-1.5">
-      {heading !== '__none__' && (
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 pt-2">
-          {heading}
-        </h3>
-      )}
-      {fields.map((f) => (
-        <FieldRow key={f.agentId} field={f} />
-      ))}
-    </div>
+    <details className="border border-gray-200 rounded-lg overflow-hidden">
+      <summary className="bg-gray-50 px-3 py-1.5 text-xs font-semibold text-gray-500 cursor-pointer select-none">
+        Fields ({visible.length})
+      </summary>
+      <div className="divide-y divide-gray-100 max-h-48 overflow-y-auto">
+        {visible.map((f) => {
+          const proposed = actionsByAgentId.get(f.agentId)
+          const done = processedSet.has(f.agentId)
+          const isCurrent = proposed && actions[currentIdx]?.action.agentId === f.agentId
+
+          return (
+            <div key={f.agentId} className={`flex items-center gap-2 px-3 py-1.5 text-xs ${isCurrent ? 'bg-blue-50' : ''}`}>
+              <KindBadge kind={f.kind} />
+              <span className="flex-1 truncate">{f.label}</span>
+              <StatusDot proposed={proposed} done={done} isCurrent={isCurrent ?? false} />
+            </div>
+          )
+        })}
+      </div>
+    </details>
   )
 }
 
-function FieldRow({ field }: { field: Field }) {
-  return (
-    <div className="flex items-center gap-2 py-1 border-b border-gray-100 last:border-0">
-      <KindBadge kind={field.kind} />
-      <span className="flex-1 text-sm truncate">{field.label}</span>
-      {field.required && (
-        <span className="text-red-400 text-xs font-semibold shrink-0">*</span>
-      )}
-    </div>
-  )
+function StatusDot({
+  proposed, done, isCurrent,
+}: {
+  proposed?: ProposedAction
+  done: boolean
+  isCurrent: boolean
+}) {
+  if (done) return <span className="text-green-500 text-base">✓</span>
+  if (isCurrent) return <span className="text-blue-500 text-base animate-pulse">●</span>
+  if (!proposed) return <span className="text-gray-300 text-base">○</span>
+  if (proposed.action.type === 'skip') return <span className="text-gray-300 text-base">–</span>
+  return <span className="text-blue-300 text-base">○</span>
 }
 
 const KIND_COLORS: Record<string, string> = {
@@ -138,21 +236,12 @@ function KindBadge({ kind }: { kind: string }) {
   )
 }
 
-function Spinner() {
+function Spinner({ small }: { small?: boolean }) {
+  const size = small ? 'h-3 w-3' : 'h-6 w-6'
   return (
-    <svg className="animate-spin h-6 w-6 text-blue-500" viewBox="0 0 24 24" fill="none">
+    <svg className={`animate-spin ${size} text-blue-500`} viewBox="0 0 24 24" fill="none">
       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
     </svg>
   )
-}
-
-function groupBySection(fields: Field[]): [string, Field[]][] {
-  const map = new Map<string, Field[]>()
-  for (const f of fields) {
-    const key = f.sectionHeading ?? '__none__'
-    if (!map.has(key)) map.set(key, [])
-    map.get(key)!.push(f)
-  }
-  return Array.from(map.entries())
 }

@@ -1,0 +1,335 @@
+/**
+ * Run state machine — persisted in chrome.storage.session so it survives
+ * service worker restarts (MV3 workers are short-lived).
+ */
+import type { PageSnapshot, ProposedAction, FrameSnapshot, StepEntry, RunStatus } from '../shared/types'
+import type { ExtensionMessage } from '../shared/messages'
+import * as api from './api'
+
+// ── State ─────────────────────────────────────────────────────────────────────
+
+export interface RunState {
+  runId: string
+  tabId: number
+  state: RunStatus
+  snapshot: PageSnapshot | null
+  actions: ProposedAction[]
+  currentIdx: number     // next action awaiting approval
+  stepLog: StepEntry[]
+  stepSeq: number
+  error?: string
+}
+
+let _abortController: AbortController | null = null
+
+// ── Persistence ───────────────────────────────────────────────────────────────
+
+async function saveState(s: RunState): Promise<void> {
+  await chrome.storage.session.set({ runState: s })
+}
+
+async function loadState(): Promise<RunState | null> {
+  const data = await chrome.storage.session.get('runState')
+  return (data.runState as RunState) ?? null
+}
+
+async function clearState(): Promise<void> {
+  await chrome.storage.session.remove('runState')
+}
+
+// ── Public API ────────────────────────────────────────────────────────────────
+
+export async function startRun(tabId: number): Promise<void> {
+  // Abort any in-flight previous run
+  _abortController?.abort()
+  _abortController = new AbortController()
+  const signal = _abortController.signal
+
+  const initial: RunState = {
+    runId: '',
+    tabId,
+    state: 'reading',
+    snapshot: null,
+    actions: [],
+    currentIdx: 0,
+    stepLog: [],
+    stepSeq: 0,
+  }
+  await saveState(initial)
+  broadcast({ kind: 'RUN_STATUS', status: 'reading' })
+
+  try {
+    // 1. Extract all frames
+    const snapshot = await extractAllFrames(tabId, signal)
+    if (signal.aborted) return
+
+    initial.snapshot = snapshot
+    await saveState(initial)
+    broadcast({ kind: 'RUN_UPDATE', snapshot })
+
+    // 2. Create run on server
+    initial.state = 'planning'
+    broadcast({ kind: 'RUN_STATUS', status: 'planning' })
+
+    const runId = await api.createRun(
+      tabId, snapshot.url, snapshot.title, snapshot.company, snapshot.jobTitle, signal,
+    )
+    if (signal.aborted) return
+    initial.runId = runId
+    await saveState(initial)
+
+    // 3. Plan
+    const actions = await api.planRun(runId, snapshot, signal)
+    if (signal.aborted) return
+
+    initial.actions = actions
+    initial.state = 'awaiting_approval'
+    initial.currentIdx = 0
+    await saveState(initial)
+
+    addStep(initial, {
+      kind: 'read_page',
+      status: 'ok',
+      message: `Read page — found ${snapshot.fields.filter((f) => f.visible).length} fields`,
+    })
+
+    broadcast({ kind: 'PLAN_READY', runId, actions })
+    broadcast({ kind: 'RUN_STATUS', status: 'awaiting_approval' })
+  } catch (err) {
+    if ((err as Error).name === 'AbortError') return
+    const msg = String(err)
+    const s = await loadState()
+    if (s) { s.state = 'error'; s.error = msg; await saveState(s) }
+    broadcast({ kind: 'RUN_STATUS', status: 'error', message: msg })
+  }
+}
+
+export async function approveAction(idx: number): Promise<void> {
+  const s = await loadState()
+  if (!s || s.state !== 'awaiting_approval') return
+  if (idx !== s.currentIdx) return
+
+  const proposed = s.actions[idx]
+  if (!proposed) return
+
+  const action = proposed.action
+  if (action.type === 'ask_user') return // waiting for an answer, not approve
+  if (action.type === 'skip') {
+    addStep(s, { kind: 'skip', status: 'skipped', agentId: action.agentId, message: action.reason })
+    await advance(s)
+    return
+  }
+
+  s.state = 'filling'
+  await saveState(s)
+  broadcast({ kind: 'RUN_STATUS', status: 'filling' })
+
+  const signal = _abortController?.signal
+
+  try {
+    // Send fill action to the right frame
+    const frameId = _frameIdForAgentId(s.snapshot, action.agentId)
+    const result = await sendFillToFrame(s.tabId, frameId, action, s.runId, idx, signal)
+    if (signal?.aborted) return
+
+    const fieldLabel = s.snapshot?.fields.find((f) => f.agentId === action.agentId)?.label ?? ''
+    addStep(s, {
+      kind: 'fill',
+      status: result.success ? 'ok' : 'failed',
+      agentId: action.agentId,
+      fieldLabel,
+      value: result.success ? result.actualValue : undefined,
+      source: proposed.source,
+      confidence: proposed.confidence,
+      message: result.success
+        ? `Filled "${fieldLabel}"`
+        : `Failed "${fieldLabel}": ${result.error}`,
+    })
+
+    broadcast({ kind: 'ACTION_FILLED', idx, success: result.success, error: result.error })
+    await advance(s)
+  } catch (err) {
+    if ((err as Error).name === 'AbortError') return
+    s.state = 'awaiting_approval'
+    await saveState(s)
+    broadcast({ kind: 'RUN_STATUS', status: 'awaiting_approval' })
+  }
+}
+
+export async function rejectAction(idx: number): Promise<void> {
+  const s = await loadState()
+  if (!s) return
+  if (idx !== s.currentIdx) return
+
+  const action = s.actions[idx]?.action
+  const fieldLabel = s.snapshot?.fields.find((f) => f.agentId === action?.agentId)?.label ?? ''
+  addStep(s, { kind: 'skip', status: 'skipped', agentId: action?.agentId, fieldLabel, message: `Skipped "${fieldLabel}"` })
+  await advance(s)
+}
+
+export async function answerQuestion(idx: number, value: string, _remember: boolean): Promise<void> {
+  const s = await loadState()
+  if (!s) return
+  if (idx !== s.currentIdx) return
+
+  const proposed = s.actions[idx]
+  if (!proposed || proposed.action.type !== 'ask_user') return
+
+  const action = proposed.action
+  const fieldLabel = s.snapshot?.fields.find((f) => f.agentId === action.agentId)?.label ?? ''
+
+  // Convert ask_user answer into a fill action and execute it
+  const fillAction = { type: 'fill' as const, agentId: action.agentId, value }
+  s.state = 'filling'
+  await saveState(s)
+  broadcast({ kind: 'RUN_STATUS', status: 'filling' })
+
+  const signal = _abortController?.signal
+  const frameId = _frameIdForAgentId(s.snapshot, action.agentId)
+  const result = await sendFillToFrame(s.tabId, frameId, fillAction, s.runId, idx, signal)
+
+  addStep(s, {
+    kind: 'answer',
+    status: result.success ? 'ok' : 'failed',
+    agentId: action.agentId,
+    fieldLabel,
+    value: result.success ? value : undefined,
+    message: result.success ? `Answered "${fieldLabel}"` : `Failed "${fieldLabel}": ${result.error}`,
+  })
+
+  broadcast({ kind: 'ACTION_FILLED', idx, success: result.success, error: result.error })
+  await advance(s)
+}
+
+export async function stop(): Promise<void> {
+  _abortController?.abort()
+  _abortController = null
+
+  const s = await loadState()
+  if (s) {
+    addStep(s, { kind: 'stop', status: 'ok', message: 'Run stopped by user' })
+    s.state = 'stopped'
+    await saveState(s)
+    await api.finishRun(s.runId, 'stopped').catch(() => {})
+  }
+
+  // Tell all frames to remove overlays
+  const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
+  const tabId = s?.tabId ?? tabs[0]?.id
+  if (tabId) {
+    chrome.tabs.sendMessage(tabId, { kind: 'STOP' }).catch(() => {})
+  }
+
+  broadcast({ kind: 'RUN_STATUS', status: 'stopped', message: 'Stopped' })
+}
+
+export async function getState(): Promise<RunState | null> {
+  return loadState()
+}
+
+// ── Internals ─────────────────────────────────────────────────────────────────
+
+async function advance(s: RunState): Promise<void> {
+  s.currentIdx++
+  if (s.currentIdx >= s.actions.length) {
+    s.state = 'done'
+    await saveState(s)
+    await api.finishRun(s.runId, 'completed').catch(() => {})
+    broadcast({ kind: 'RUN_STATUS', status: 'done', message: 'All fields processed' })
+    return
+  }
+  s.state = 'awaiting_approval'
+  await saveState(s)
+  broadcast({ kind: 'RUN_STATUS', status: 'awaiting_approval' })
+}
+
+function addStep(
+  s: RunState,
+  partial: Omit<StepEntry, 'seq' | 'ts'>,
+): void {
+  const entry: StepEntry = {
+    seq: s.stepSeq++,
+    ts: new Date().toISOString(),
+    ...partial,
+  }
+  s.stepLog.push(entry)
+  broadcast({ kind: 'STEP_LOGGED', entry })
+}
+
+function broadcast(msg: ExtensionMessage): void {
+  chrome.runtime.sendMessage(msg).catch(() => {})
+}
+
+function _frameIdForAgentId(snapshot: PageSnapshot | null, agentId: string): number {
+  if (!snapshot) return 0
+  const field = snapshot.fields.find((f) => f.agentId === agentId)
+  return field?.frameId ?? 0
+}
+
+async function sendFillToFrame(
+  tabId: number,
+  frameId: number,
+  action: ExtensionMessage extends { kind: 'FILL_ACTION'; action: infer A } ? A : never,
+  runId: string,
+  idx: number,
+  signal?: AbortSignal,
+): Promise<{ success: boolean; actualValue?: string; error?: string }> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) { reject(new DOMException('AbortError', 'AbortError')); return }
+    const onAbort = () => reject(new DOMException('AbortError', 'AbortError'))
+    signal?.addEventListener('abort', onAbort, { once: true })
+
+    chrome.tabs.sendMessage(
+      tabId,
+      { kind: 'FILL_ACTION', action, runId, idx } satisfies ExtensionMessage,
+      { frameId },
+      (resp) => {
+        signal?.removeEventListener('abort', onAbort)
+        if (chrome.runtime.lastError) {
+          resolve({ success: false, error: chrome.runtime.lastError.message })
+        } else {
+          resolve(resp ?? { success: false, error: 'No response' })
+        }
+      },
+    )
+  })
+}
+
+async function extractAllFrames(tabId: number, signal: AbortSignal): Promise<PageSnapshot> {
+  if (signal.aborted) throw new DOMException('AbortError', 'AbortError')
+
+  const frameResults = await chrome.scripting.executeScript({
+    target: { tabId, allFrames: true },
+    func: () => true,
+  })
+  const frameIds = frameResults.map((r) => r.frameId ?? 0)
+
+  const snapshots: FrameSnapshot[] = []
+  for (const frameId of frameIds) {
+    if (signal.aborted) throw new DOMException('AbortError', 'AbortError')
+    try {
+      const resp = await chrome.tabs.sendMessage(
+        tabId,
+        { kind: 'EXTRACT_REQUEST', frameId } satisfies ExtensionMessage,
+        { frameId },
+      )
+      if (resp?.kind === 'EXTRACT_RESPONSE') snapshots.push(resp.snapshot as FrameSnapshot)
+    } catch { /* cross-origin iframe, skip */ }
+  }
+
+  return merge(snapshots)
+}
+
+function merge(frames: FrameSnapshot[]): PageSnapshot {
+  const main = frames.find((f) => f.frameId === 0) ?? frames[0]
+  return {
+    url: main?.url ?? '',
+    domain: (() => { try { return new URL(main?.url ?? '').hostname } catch { return '' } })(),
+    title: main?.title ?? '',
+    atsGuess: main?.atsGuess,
+    jobTitle: main?.jobTitle,
+    company: main?.company,
+    fields: frames.flatMap((f) => f.fields),
+    buttons: frames.flatMap((f) => f.buttons),
+  }
+}

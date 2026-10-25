@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Settings from './tabs/Settings'
 import Run from './tabs/Run'
-import type { PageSnapshot, RunStatus } from '../shared/types'
+import type { PageSnapshot, ProposedAction, StepEntry, RunStatus } from '../shared/types'
 import type { ExtensionMessage } from '../shared/messages'
 
 type Tab = 'run' | 'history' | 'rules' | 'profile' | 'settings'
@@ -22,6 +22,9 @@ export default function App() {
   const [conn, setConn] = useState<ConnectionStatus>('checking')
   const [runStatus, setRunStatus] = useState<RunStatus>('idle')
   const [snapshot, setSnapshot] = useState<PageSnapshot | null>(null)
+  const [actions, setActions] = useState<ProposedAction[]>([])
+  const [currentIdx, setCurrentIdx] = useState(0)
+  const [steps, setSteps] = useState<StepEntry[]>([])
   const [runError, setRunError] = useState<string | undefined>()
 
   const checkConn = useCallback(async () => {
@@ -34,18 +37,32 @@ export default function App() {
     } catch { setConn('offline') }
   }, [])
 
-  // Listen for messages from the service worker
   useEffect(() => {
     checkConn()
     const listener = (msg: ExtensionMessage) => {
       if (msg.kind === 'RUN_STATUS') {
-        setRunStatus(msg.status === 'reading' ? 'reading' : msg.status === 'error' ? 'error' : 'idle')
+        setRunStatus(msg.status)
         if (msg.status === 'error') setRunError(msg.message)
+        if (msg.status === 'idle' || msg.status === 'reading') {
+          setActions([])
+          setCurrentIdx(0)
+          setSteps([])
+          setRunError(undefined)
+        }
       }
       if (msg.kind === 'RUN_UPDATE') {
         setSnapshot(msg.snapshot)
-        setRunStatus('ready')
         setTab('run')
+      }
+      if (msg.kind === 'PLAN_READY') {
+        setActions(msg.actions)
+        setCurrentIdx(0)
+      }
+      if (msg.kind === 'STEP_LOGGED') {
+        setSteps((prev) => [...prev, msg.entry])
+      }
+      if (msg.kind === 'ACTION_FILLED') {
+        setCurrentIdx((i) => i + 1)
       }
     }
     chrome.runtime.onMessage.addListener(listener)
@@ -57,7 +74,33 @@ export default function App() {
     if (!activeTab?.id) return
     setRunStatus('reading')
     setRunError(undefined)
-    chrome.runtime.sendMessage({ kind: 'START_RUN', tabId: activeTab.id })
+    setActions([])
+    setCurrentIdx(0)
+    setSteps([])
+    chrome.runtime.sendMessage({ kind: 'START_RUN', tabId: activeTab.id } satisfies ExtensionMessage)
+  }
+
+  function handleStop() {
+    chrome.runtime.sendMessage({ kind: 'STOP' } satisfies ExtensionMessage)
+  }
+
+  function handleApprove(idx: number, editedValue?: string) {
+    if (editedValue !== undefined && actions[idx]?.action.type === 'fill') {
+      const updated = actions.map((a, i) => {
+        if (i !== idx) return a
+        return { ...a, action: { ...a.action, value: editedValue } }
+      })
+      setActions(updated)
+    }
+    chrome.runtime.sendMessage({ kind: 'APPROVE_ACTION', idx } satisfies ExtensionMessage)
+  }
+
+  function handleReject(idx: number) {
+    chrome.runtime.sendMessage({ kind: 'REJECT_ACTION', idx } satisfies ExtensionMessage)
+  }
+
+  function handleAnswer(idx: number, value: string, remember: boolean) {
+    chrome.runtime.sendMessage({ kind: 'ANSWER_QUESTION', idx, value, remember } satisfies ExtensionMessage)
   }
 
   const connDot = {
@@ -96,11 +139,18 @@ export default function App() {
       <main className="flex-1 overflow-y-auto p-4">
         {tab === 'run' && (
           <Run
-            status={runStatus}
+            runStatus={runStatus}
             snapshot={snapshot}
+            actions={actions}
+            currentIdx={currentIdx}
+            steps={steps}
             serverConnected={conn === 'connected'}
             error={runError}
             onActivate={handleActivate}
+            onStop={handleStop}
+            onApprove={handleApprove}
+            onReject={handleReject}
+            onAnswer={handleAnswer}
           />
         )}
         {tab === 'history' && <Stub label="History" />}

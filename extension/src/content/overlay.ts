@@ -123,3 +123,35 @@ export function removeStatusBar(): void {
   barEl?.remove()
   barEl = null
 }
+
+// Per-field status colors during a fill run
+const _outlineEls = new Map<string, HTMLElement>()
+
+export function updateFieldStatus(agentId: string, status: 'proposed' | 'waiting' | 'filled' | 'blocked' | 'skip'): void {
+  const sr = shadowRoot()
+  if (!sr) return
+
+  const color = COLORS[status] ?? COLORS.proposed
+
+  // Find or create a dedicated status outline for this field
+  let outline = sr.querySelector<HTMLElement>(`[data-ip-status="${agentId}"]`)
+  if (!outline) {
+    const el = document.querySelector(`[data-ip-id="${agentId}"]`)
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    if (rect.width === 0 && rect.height === 0) return
+
+    outline = document.createElement('div')
+    outline.setAttribute('data-ip-status', agentId)
+    outline.style.cssText = [
+      'position:fixed', `top:${rect.top - 3}px`, `left:${rect.left - 3}px`,
+      `width:${rect.width + 6}px`, `height:${rect.height + 6}px`,
+      'border-radius:5px', 'pointer-events:none',
+      'transition:border-color .2s, box-shadow .2s',
+    ].join(';')
+    sr.appendChild(outline)
+  }
+
+  outline.style.border = `2px solid ${color}`
+  outline.style.boxShadow = `0 0 0 1px ${color}40`
+}

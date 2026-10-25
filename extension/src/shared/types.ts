@@ -63,9 +63,57 @@ export interface PageSnapshot {
   stepIndicator?: string
 }
 
-export type RunStatus = 'idle' | 'reading' | 'ready' | 'error'
+export type RunStatus = 'idle' | 'reading' | 'planning' | 'awaiting_approval' | 'filling' | 'stopped' | 'error' | 'done'
 
-// Server schemas
+// ── Actions ───────────────────────────────────────────────────────────────────
+
+export type Action =
+  | { type: 'fill'; agentId: string; value: string }
+  | { type: 'select'; agentId: string; optionLabel: string }
+  | { type: 'check'; agentId: string; checked: boolean }
+  | { type: 'choose_radio'; agentId: string; optionLabel: string }
+  | { type: 'upload'; agentId: string; documentKey: string }
+  | { type: 'click'; agentId: string; purpose: 'next' | 'add_entry' | 'expand' }
+  | { type: 'ask_user'; agentId: string; question: string; reason: string; suggestions?: string[] }
+  | { type: 'skip'; agentId: string; reason: string }
+
+export interface ProposedAction {
+  action: Action
+  source: 'rule' | 'memory' | 'profile' | 'llm' | 'research' | 'user'
+  confidence: number
+  sensitivity: 'low' | 'medium' | 'high'
+  explanation: string
+  memoryRefs?: string[]
+}
+
+// ── Step log ──────────────────────────────────────────────────────────────────
+
+export type StepKind =
+  | 'read_page' | 'propose' | 'approve' | 'edit' | 'skip'
+  | 'fill' | 'click' | 'ask' | 'answer' | 'navigate'
+  | 'error' | 'stop' | 'feedback'
+
+export type StepStatus = 'ok' | 'waiting' | 'skipped' | 'failed'
+
+export interface StepEntry {
+  seq: number
+  ts: string
+  kind: StepKind
+  status: StepStatus
+  fieldLabel?: string
+  agentId?: string
+  value?: string
+  source?: string
+  confidence?: number
+  message: string
+  durationMs?: number
+}
+
+// ── Server schemas ────────────────────────────────────────────────────────────
+
 export interface HealthResponse { status: string; version: string }
 export interface PairRequest { code: string }
 export interface PairResponse { token: string }
+export interface RunCreateRequest { tabId: number; url: string; title?: string; company?: string; jobTitle?: string }
+export interface RunResponse { runId: string }
+export interface PlanResponse { runId: string; actions: ProposedAction[] }

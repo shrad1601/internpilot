@@ -1,6 +1,7 @@
 import { extractPage } from './extract'
-import { initOverlay, removeOverlay, renderFieldOutlines, showStatusBar, removeStatusBar } from './overlay'
+import { initOverlay, removeOverlay, renderFieldOutlines, showStatusBar, removeStatusBar, updateFieldStatus } from './overlay'
 import { initStopListener, removeStopListener } from './stop'
+import { executeAction } from './fill'
 import type { ExtensionMessage } from '../shared/messages'
 
 chrome.runtime.onMessage.addListener(
@@ -10,7 +11,6 @@ chrome.runtime.onMessage.addListener(
         const snapshot = extractPage(document, window.location.href, msg.frameId)
         sendResponse({ kind: 'EXTRACT_RESPONSE', snapshot })
 
-        // Only main frame (frameId 0) drives the overlay
         if (msg.frameId === 0) {
           initOverlay()
           renderFieldOutlines(snapshot.fields)
@@ -23,7 +23,31 @@ chrome.runtime.onMessage.addListener(
       } catch (err) {
         sendResponse({ kind: 'EXT_ERROR', message: String(err) })
       }
-      return true // keep channel open for async sendResponse
+      return true
+    }
+
+    if (msg.kind === 'FILL_ACTION') {
+      updateFieldStatus(msg.action.agentId, 'waiting')
+
+      executeAction(msg.action).then((result) => {
+        updateFieldStatus(msg.action.agentId, result.success ? 'filled' : 'blocked')
+        sendResponse({
+          kind: 'FILL_RESULT',
+          idx: msg.idx,
+          success: result.success,
+          actualValue: result.actualValue,
+          error: result.error,
+        } satisfies ExtensionMessage)
+      }).catch((err) => {
+        updateFieldStatus(msg.action.agentId, 'blocked')
+        sendResponse({
+          kind: 'FILL_RESULT',
+          idx: msg.idx,
+          success: false,
+          error: String(err),
+        } satisfies ExtensionMessage)
+      })
+      return true // async sendResponse
     }
 
     if (msg.kind === 'STOP') {
