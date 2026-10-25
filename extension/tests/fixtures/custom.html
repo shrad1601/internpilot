@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Junior Developer Application - SmallCo</title></head>
+<body>
+<!-- Messy custom form: no for attributes, labels are nearby divs, placeholder-only fields -->
+<div class="apply-container">
+  <h2>Apply: Junior Developer</h2>
+  <p>SmallCo</p>
+
+  <!-- Labels as sibling divs (no for attr) -->
+  <div class="form-row">
+    <div class="label">Your full name *</div>
+    <input type="text" name="fullName" class="inp" required>
+  </div>
+  <div class="form-row">
+    <div class="label">Email address *</div>
+    <input type="email" name="email" class="inp" required>
+  </div>
+
+  <!-- aria-label only fields -->
+  <div class="form-row">
+    <input type="tel" name="phone" class="inp" aria-label="Phone Number" placeholder="+1 (555) 000-0000">
+  </div>
+
+  <!-- placeholder-only -->
+  <div class="form-row">
+    <input type="text" name="city" class="inp" placeholder="City">
+  </div>
+
+  <!-- Wrapping label -->
+  <div class="form-row">
+    <label>
+      GitHub Profile URL
+      <input type="text" name="github" class="inp" placeholder="https://github.com/...">
+    </label>
+  </div>
+
+  <!-- Select with nearby text label -->
+  <div class="form-row">
+    <span class="field-label">Preferred work type</span>
+    <select name="workType" class="sel">
+      <option value="">Choose...</option>
+      <option value="remote">Remote</option>
+      <option value="hybrid">Hybrid</option>
+      <option value="onsite">On-site</option>
+    </select>
+  </div>
+
+  <!-- Radio group: no fieldset/legend, labels wrap inputs -->
+  <div class="form-row">
+    <div class="label">Are you a US citizen?</div>
+    <div class="radio-wrap">
+      <label><input type="radio" name="usCitizen" value="yes"> Yes</label>
+      <label><input type="radio" name="usCitizen" value="no"> No</label>
+    </div>
+  </div>
+
+  <!-- Checkbox group -->
+  <div class="form-row">
+    <div class="label">Languages you know (check all that apply)</div>
+    <div class="checkbox-wrap">
+      <label><input type="checkbox" name="lang_js" value="js"> JavaScript</label>
+      <label><input type="checkbox" name="lang_py" value="py"> Python</label>
+      <label><input type="checkbox" name="lang_go" value="go"> Go</label>
+      <label><input type="checkbox" name="lang_rs" value="rs"> Rust</label>
+    </div>
+  </div>
+
+  <!-- Textarea with nearby label -->
+  <div class="form-row">
+    <div class="label">Tell us about yourself</div>
+    <textarea name="about" class="ta" rows="5" placeholder="Write a few sentences..."></textarea>
+  </div>
+
+  <!-- Hidden field — should NOT appear -->
+  <input type="hidden" name="source" value="career-page">
+
+  <!-- Resume file upload with only placeholder text nearby -->
+  <div class="form-row">
+    <div class="label">Attach resume (PDF) *</div>
+    <input type="file" name="resume" accept=".pdf" required>
+  </div>
+
+  <!-- Invisible field — should NOT appear -->
+  <div style="display:none;">
+    <input type="text" name="bot_trap">
+  </div>
+
+  <button type="submit">Send Application</button>
+</div>
+</body>
+</html>

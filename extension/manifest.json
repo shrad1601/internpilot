@@ -25,12 +25,12 @@
     "default_title": "InternPilot"
   },
   "commands": {
-    "activate": {
+    "_execute_action": {
       "suggested_key": {
         "mac": "Command+Shift+Y",
         "default": "Ctrl+Shift+Y"
       },
-      "description": "Activate InternPilot"
+      "description": "Open InternPilot"
     },
     "stop": {
       "suggested_key": {

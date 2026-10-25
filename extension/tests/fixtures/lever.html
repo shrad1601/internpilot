@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Product Manager - Lever</title></head>
+<body>
+<div class="posting-headline">
+  <h2>Product Manager</h2>
+  <div class="posting-categories">
+    <span class="posting-org">Startup Inc</span>
+  </div>
+</div>
+<form class="application-form" data-lever-source="lever">
+  <h3>Personal Information</h3>
+  <div class="application-field">
+    <label class="application-label" for="name">Full Name <span aria-hidden="true">*</span></label>
+    <input class="application-input" type="text" id="name" name="name" required aria-required="true">
+  </div>
+  <div class="application-field">
+    <label class="application-label" for="email">Email <span aria-hidden="true">*</span></label>
+    <input class="application-input" type="email" id="email" name="email" required aria-required="true">
+  </div>
+  <div class="application-field">
+    <label class="application-label" for="phone">Phone</label>
+    <input class="application-input" type="tel" id="phone" name="phone">
+  </div>
+  <div class="application-field">
+    <label class="application-label" for="org">Current Company</label>
+    <input class="application-input" type="text" id="org" name="org">
+  </div>
+
+  <h3>Resume and Links</h3>
+  <div class="application-field">
+    <label class="application-label">Resume <span aria-hidden="true">*</span></label>
+    <input type="file" name="resume" accept=".pdf,.doc,.docx" required aria-label="Upload Resume">
+  </div>
+  <div class="application-field">
+    <label class="application-label" for="urls_LinkedIn">LinkedIn URL</label>
+    <input class="application-input" type="text" id="urls_LinkedIn" name="urls[LinkedIn]" placeholder="LinkedIn URL">
+  </div>
+  <div class="application-field">
+    <label class="application-label" for="urls_GitHub">GitHub URL</label>
+    <input class="application-input" type="text" id="urls_GitHub" name="urls[GitHub]" placeholder="GitHub URL">
+  </div>
+  <div class="application-field">
+    <label class="application-label" for="urls_Portfolio">Portfolio URL</label>
+    <input class="application-input" type="text" id="urls_Portfolio" name="urls[Portfolio]" placeholder="Portfolio URL">
+  </div>
+
+  <h3>Additional Questions</h3>
+  <div class="application-field">
+    <label class="application-label" for="cards_years_experience">Years of Product Experience <span aria-hidden="true">*</span></label>
+    <select id="cards_years_experience" name="cards[years_experience]" required>
+      <option value="">Select...</option>
+      <option value="0-2">0–2 years</option>
+      <option value="3-5">3–5 years</option>
+      <option value="6-10">6–10 years</option>
+      <option value="10+">10+ years</option>
+    </select>
+  </div>
+  <div class="application-field">
+    <label class="application-label" for="cards_cover">Why do you want to join us?</label>
+    <textarea id="cards_cover" name="cards[cover]" rows="5"></textarea>
+  </div>
+  <button type="submit" class="template-btn-submit">Submit Application</button>
+</form>
+</body>
+</html>

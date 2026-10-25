@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Software Engineer - Acme Corp | Greenhouse</title></head>
+<body>
+<h1 class="app-title">Software Engineer</h1>
+<p class="company-name">Acme Corp</p>
+<form id="application_form" action="https://boards.greenhouse.io/acmecorp/jobs/12345" method="post">
+  <div class="field">
+    <label for="first_name">First Name <span class="required">*</span></label>
+    <input type="text" id="first_name" name="first_name" required>
+  </div>
+  <div class="field">
+    <label for="last_name">Last Name <span class="required">*</span></label>
+    <input type="text" id="last_name" name="last_name" required>
+  </div>
+  <div class="field">
+    <label for="email">Email Address <span class="required">*</span></label>
+    <input type="email" id="email" name="email" required>
+  </div>
+  <div class="field">
+    <label for="phone">Phone Number</label>
+    <input type="tel" id="phone" name="phone">
+  </div>
+  <div class="field">
+    <label for="resume">Resume/CV <span class="required">*</span></label>
+    <input type="file" id="resume" name="resume" accept=".pdf,.doc,.docx" required>
+  </div>
+  <div class="field">
+    <label for="cover_letter">Cover Letter</label>
+    <textarea id="cover_letter" name="cover_letter" rows="6"></textarea>
+  </div>
+  <div class="field">
+    <label for="linkedin_profile">LinkedIn Profile</label>
+    <input type="text" id="linkedin_profile" name="linkedin_profile" placeholder="https://linkedin.com/in/your-profile">
+  </div>
+  <fieldset>
+    <legend>Work Authorization</legend>
+    <div class="radio-field">
+      <label><input type="radio" name="work_auth" value="yes"> Yes, I am authorized to work in the US</label>
+    </div>
+    <div class="radio-field">
+      <label><input type="radio" name="work_auth" value="no"> No, I require sponsorship</label>
+    </div>
+  </fieldset>
+  <div class="field">
+    <label for="start_date">Earliest Start Date</label>
+    <input type="date" id="start_date" name="start_date">
+  </div>
+  <div class="field">
+    <label for="how_heard">How did you hear about this position?</label>
+    <select id="how_heard" name="how_heard">
+      <option value="">Select one...</option>
+      <option value="linkedin">LinkedIn</option>
+      <option value="indeed">Indeed</option>
+      <option value="referral">Employee Referral</option>
+      <option value="company_website">Company Website</option>
+    </select>
+  </div>
+  <div class="field">
+    <label><input type="checkbox" name="acknowledge" required> I acknowledge that all information provided is accurate</label>
+  </div>
+  <button type="submit">Submit Application</button>
+</form>
+</body>
+</html>

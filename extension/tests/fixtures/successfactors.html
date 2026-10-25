@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Marketing Manager - SAP SuccessFactors</title></head>
+<body>
+<div id="app-container">
+<h1>Marketing Manager</h1>
+<h2>GlobalCorp</h2>
+<!-- SuccessFactors uses table-based layouts with IDs -->
+<form id="candidateApplicationForm" method="post">
+  <table class="application-table" role="presentation">
+    <tbody>
+      <tr>
+        <td class="label-cell"><label for="sf_firstName">First Name</label><span class="required-star">*</span></td>
+        <td class="input-cell"><input type="text" id="sf_firstName" name="firstName" class="inputfield" required></td>
+      </tr>
+      <tr>
+        <td class="label-cell"><label for="sf_lastName">Last Name</label><span class="required-star">*</span></td>
+        <td class="input-cell"><input type="text" id="sf_lastName" name="lastName" class="inputfield" required></td>
+      </tr>
+      <tr>
+        <td class="label-cell"><label for="sf_email">Email</label><span class="required-star">*</span></td>
+        <td class="input-cell"><input type="email" id="sf_email" name="email" class="inputfield" required></td>
+      </tr>
+      <tr>
+        <td class="label-cell"><label for="sf_phone">Mobile Phone</label></td>
+        <td class="input-cell"><input type="tel" id="sf_phone" name="mobilePhone" class="inputfield"></td>
+      </tr>
+      <tr>
+        <td class="label-cell"><label for="sf_country">Country of Residence</label><span class="required-star">*</span></td>
+        <td class="input-cell">
+          <select id="sf_country" name="country" class="selectfield" required>
+            <option value="">-- Select --</option>
+            <option value="US">United States</option>
+            <option value="CA">Canada</option>
+            <option value="GB">United Kingdom</option>
+          </select>
+        </td>
+      </tr>
+      <tr>
+        <td class="label-cell"><label for="sf_education">Highest Education Level</label></td>
+        <td class="input-cell">
+          <select id="sf_education" name="education" class="selectfield">
+            <option value="">-- Select --</option>
+            <option value="HS">High School</option>
+            <option value="BS">Bachelor's Degree</option>
+            <option value="MS">Master's Degree</option>
+            <option value="PHD">PhD</option>
+          </select>
+        </td>
+      </tr>
+      <tr>
+        <td class="label-cell"><label for="sf_yearsexp">Years of Experience</label><span class="required-star">*</span></td>
+        <td class="input-cell">
+          <select id="sf_yearsexp" name="yearsExperience" class="selectfield" required>
+            <option value="">-- Select --</option>
+            <option value="0-2">Less than 2</option>
+            <option value="2-5">2–5</option>
+            <option value="5-10">5–10</option>
+            <option value="10+">10+</option>
+          </select>
+        </td>
+      </tr>
+      <tr>
+        <td class="label-cell"><label for="sf_linkedin">LinkedIn URL</label></td>
+        <td class="input-cell"><input type="text" id="sf_linkedin" name="linkedin" class="inputfield" placeholder="https://linkedin.com/in/"></td>
+      </tr>
+      <tr>
+        <td class="label-cell"><label for="sf_resume">Resume</label><span class="required-star">*</span></td>
+        <td class="input-cell"><input type="file" id="sf_resume" name="resume" accept=".pdf,.doc,.docx" required></td>
+      </tr>
+      <tr>
+        <td class="label-cell"><label for="sf_cover">Cover Letter</label></td>
+        <td class="input-cell"><textarea id="sf_cover" name="coverLetter" class="textareafield" rows="5"></textarea></td>
+      </tr>
+      <tr>
+        <td colspan="2" class="checkbox-cell">
+          <label><input type="checkbox" name="consent" required> I consent to the collection and processing of my personal data <span class="required-star">*</span></label>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="button-bar">
+    <button type="button" class="btn-back">Back</button>
+    <button type="submit" class="btn-submit">Submit Application</button>
+  </div>
+</form>
+</div>
+</body>
+</html>

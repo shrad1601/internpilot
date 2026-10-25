@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Data Scientist - BigCo - Workday</title></head>
+<body>
+<div class="WDTHEMEABC">
+<h2 class="gwt-Label WDTHEME">Data Scientist</h2>
+<div class="gwt-Label WDTHEME">BigCo</div>
+<div role="main" class="WD-content">
+  <div data-automation-id="applicationPage">
+
+    <!-- Text input using aria-labelledby -->
+    <div data-automation-id="formField-legalName" role="group" aria-labelledby="label-legalName">
+      <label id="label-legalName" data-automation-id="formLabel">Legal Name <span aria-hidden="true">*</span></label>
+      <input data-automation-id="legalNameSection_firstName" type="text" aria-required="true" aria-label="First Name">
+      <input data-automation-id="legalNameSection_lastName" type="text" aria-required="true" aria-label="Last Name">
+    </div>
+
+    <!-- Email with aria-label -->
+    <div data-automation-id="formField-email">
+      <label data-automation-id="formLabel" for="email-primary">Email Address <span aria-hidden="true">*</span></label>
+      <input id="email-primary" data-automation-id="email" type="email" aria-required="true">
+    </div>
+
+    <!-- Combobox: Workday-style custom select -->
+    <div data-automation-id="formField-country" role="group" aria-labelledby="label-country">
+      <label id="label-country" data-automation-id="formLabel">Country <span aria-hidden="true">*</span></label>
+      <div role="combobox" aria-expanded="false" aria-haspopup="listbox" aria-labelledby="label-country"
+           aria-required="true" tabindex="0" data-automation-id="countryDropdown">
+        <div data-automation-id="selectedItem">United States</div>
+        <button aria-label="Open Country list">▼</button>
+      </div>
+    </div>
+
+    <!-- Address -->
+    <div data-automation-id="formField-addressLine1">
+      <label data-automation-id="formLabel" for="addr1">Address Line 1 <span aria-hidden="true">*</span></label>
+      <input id="addr1" type="text" aria-required="true">
+    </div>
+    <div data-automation-id="formField-city">
+      <label data-automation-id="formLabel" for="city">City <span aria-hidden="true">*</span></label>
+      <input id="city" type="text" aria-required="true">
+    </div>
+
+    <!-- Combobox for State -->
+    <div data-automation-id="formField-state" role="group" aria-labelledby="label-state">
+      <label id="label-state" data-automation-id="formLabel">State</label>
+      <div role="combobox" aria-expanded="false" aria-haspopup="listbox" aria-labelledby="label-state"
+           tabindex="0" data-automation-id="stateDropdown">
+        <div data-automation-id="selectedItem">California</div>
+        <button aria-label="Open State list">▼</button>
+      </div>
+    </div>
+
+    <!-- Phone -->
+    <div data-automation-id="formField-phone">
+      <label data-automation-id="formLabel" for="phone">Phone Number</label>
+      <input id="phone" type="tel">
+    </div>
+
+    <!-- Resume upload -->
+    <div data-automation-id="formField-resume">
+      <label data-automation-id="formLabel">Resume / CV <span aria-hidden="true">*</span></label>
+      <input type="file" aria-label="Upload Resume" aria-required="true" accept=".pdf,.doc,.docx">
+    </div>
+
+    <!-- Radio-group using role=radiogroup -->
+    <div role="radiogroup" aria-labelledby="label-sponsor" aria-required="true">
+      <label id="label-sponsor">Will you now, or in the future, require sponsorship?</label>
+      <label><input type="radio" name="sponsorship" value="yes" aria-labelledby="label-sponsor"> Yes</label>
+      <label><input type="radio" name="sponsorship" value="no" aria-labelledby="label-sponsor"> No</label>
+    </div>
+
+    <!-- Textarea -->
+    <div data-automation-id="formField-coverLetter">
+      <label data-automation-id="formLabel" for="coverletter">Cover Letter</label>
+      <textarea id="coverletter" rows="8"></textarea>
+    </div>
+
+    <button data-automation-id="bottom-navigation-next-btn">Next</button>
+  </div>
+</div>
+</div>
+</body>
+</html>

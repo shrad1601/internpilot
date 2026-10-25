@@ -1,57 +1,73 @@
 import { useState, useEffect, useCallback } from 'react'
 import Settings from './tabs/Settings'
+import Run from './tabs/Run'
+import type { PageSnapshot, RunStatus } from '../shared/types'
+import type { ExtensionMessage } from '../shared/messages'
 
 type Tab = 'run' | 'history' | 'rules' | 'profile' | 'settings'
 type ConnectionStatus = 'checking' | 'connected' | 'offline' | 'unpaired'
 
 const SERVER = 'http://127.0.0.1:8765'
 
-async function getStoredToken(): Promise<string | null> {
-  return new Promise((resolve) => {
-    chrome.storage.local.get('ipToken', (data) => {
-      resolve((data as { ipToken?: string }).ipToken ?? null)
-    })
-  })
+async function getToken(): Promise<string | null> {
+  return new Promise((resolve) =>
+    chrome.storage.local.get('ipToken', (d) =>
+      resolve((d as { ipToken?: string }).ipToken ?? null),
+    ),
+  )
 }
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('run')
-  const [status, setStatus] = useState<ConnectionStatus>('checking')
+  const [conn, setConn] = useState<ConnectionStatus>('checking')
+  const [runStatus, setRunStatus] = useState<RunStatus>('idle')
+  const [snapshot, setSnapshot] = useState<PageSnapshot | null>(null)
+  const [runError, setRunError] = useState<string | undefined>()
 
-  const checkConnection = useCallback(async () => {
-    setStatus('checking')
+  const checkConn = useCallback(async () => {
+    setConn('checking')
+    const token = await getToken()
+    if (!token) { setConn('unpaired'); return }
     try {
-      const token = await getStoredToken()
-      if (!token) {
-        setStatus('unpaired')
-        return
-      }
-      const res = await fetch(`${SERVER}/health`, {
-        headers: { 'X-IP-Token': token },
-      })
-      setStatus(res.ok ? 'connected' : 'offline')
-    } catch {
-      setStatus('offline')
-    }
+      const res = await fetch(`${SERVER}/health`, { headers: { 'X-IP-Token': token } })
+      setConn(res.ok ? 'connected' : 'offline')
+    } catch { setConn('offline') }
   }, [])
 
+  // Listen for messages from the service worker
   useEffect(() => {
-    checkConnection()
-  }, [checkConnection])
+    checkConn()
+    const listener = (msg: ExtensionMessage) => {
+      if (msg.kind === 'RUN_STATUS') {
+        setRunStatus(msg.status === 'reading' ? 'reading' : msg.status === 'error' ? 'error' : 'idle')
+        if (msg.status === 'error') setRunError(msg.message)
+      }
+      if (msg.kind === 'RUN_UPDATE') {
+        setSnapshot(msg.snapshot)
+        setRunStatus('ready')
+        setTab('run')
+      }
+    }
+    chrome.runtime.onMessage.addListener(listener)
+    return () => chrome.runtime.onMessage.removeListener(listener)
+  }, [checkConn])
 
-  const statusDot = {
-    checking: 'bg-gray-400',
-    connected: 'bg-green-500',
-    offline: 'bg-red-500',
-    unpaired: 'bg-amber-400',
-  }[status]
+  async function handleActivate() {
+    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true })
+    if (!activeTab?.id) return
+    setRunStatus('reading')
+    setRunError(undefined)
+    chrome.runtime.sendMessage({ kind: 'START_RUN', tabId: activeTab.id })
+  }
 
-  const statusLabel = {
-    checking: 'Checking…',
-    connected: 'Server connected',
-    offline: 'Server offline',
-    unpaired: 'Not paired',
-  }[status]
+  const connDot = {
+    checking: 'bg-gray-400', connected: 'bg-green-500',
+    offline: 'bg-red-500', unpaired: 'bg-amber-400',
+  }[conn]
+  const connLabel = {
+    checking: 'Checking…', connected: 'Server connected',
+    offline: 'Server offline', unpaired: 'Not paired',
+  }[conn]
 
   const tabs: Tab[] = ['run', 'history', 'rules', 'profile', 'settings']
 
@@ -61,21 +77,16 @@ export default function App() {
         <div className="flex items-center justify-between mb-2">
           <span className="font-semibold text-base tracking-tight">InternPilot</span>
           <div className="flex items-center gap-1.5">
-            <span className={`w-2 h-2 rounded-full ${statusDot}`} />
-            <span className="text-xs text-gray-500">{statusLabel}</span>
+            <span className={`w-2 h-2 rounded-full ${connDot}`} />
+            <span className="text-xs text-gray-500">{connLabel}</span>
           </div>
         </div>
         <nav className="flex gap-0.5">
           {tabs.map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
+            <button key={t} onClick={() => setTab(t)}
               className={`px-2.5 py-1.5 text-xs rounded-t capitalize transition-colors ${
-                tab === t
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100'
-              }`}
-            >
+                tab === t ? 'bg-blue-600 text-white' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100'
+              }`}>
               {t}
             </button>
           ))}
@@ -83,61 +94,24 @@ export default function App() {
       </header>
 
       <main className="flex-1 overflow-y-auto p-4">
-        {tab === 'run' && <RunTab status={status} />}
-        {tab === 'history' && <StubTab label="History" />}
-        {tab === 'rules' && <StubTab label="Rules" />}
-        {tab === 'profile' && <StubTab label="Profile" />}
-        {tab === 'settings' && (
-          <Settings onConnectionChange={checkConnection} />
+        {tab === 'run' && (
+          <Run
+            status={runStatus}
+            snapshot={snapshot}
+            serverConnected={conn === 'connected'}
+            error={runError}
+            onActivate={handleActivate}
+          />
         )}
+        {tab === 'history' && <Stub label="History" />}
+        {tab === 'rules' && <Stub label="Rules" />}
+        {tab === 'profile' && <Stub label="Profile" />}
+        {tab === 'settings' && <Settings onConnectionChange={checkConn} />}
       </main>
     </div>
   )
 }
 
-function RunTab({ status }: { status: ConnectionStatus }) {
-  if (status === 'connected') {
-    return (
-      <div className="text-center py-10 text-gray-500 space-y-2">
-        <p className="text-base font-medium text-gray-700">Ready</p>
-        <p>
-          Navigate to a job application page and press{' '}
-          <kbd className="bg-gray-100 border border-gray-300 px-1.5 py-0.5 rounded text-xs font-mono">
-            ⌘⇧Y
-          </kbd>{' '}
-          to start.
-        </p>
-      </div>
-    )
-  }
-  if (status === 'unpaired') {
-    return (
-      <div className="text-center py-10 text-gray-500">
-        <p>Go to <strong>Settings</strong> to pair with the server.</p>
-      </div>
-    )
-  }
-  if (status === 'offline') {
-    return (
-      <div className="text-center py-10 text-gray-500">
-        <p>Server is offline. Start it with:</p>
-        <pre className="mt-2 bg-gray-100 rounded px-3 py-2 text-xs text-left inline-block">
-          cd server && uv run python -m internpilot
-        </pre>
-      </div>
-    )
-  }
-  return (
-    <div className="text-center py-10 text-gray-400">
-      <p>Checking server…</p>
-    </div>
-  )
-}
-
-function StubTab({ label }: { label: string }) {
-  return (
-    <div className="text-center py-10 text-gray-400">
-      <p>{label} — coming soon.</p>
-    </div>
-  )
+function Stub({ label }: { label: string }) {
+  return <div className="text-center py-10 text-gray-400">{label} — coming soon.</div>
 }
