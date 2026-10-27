@@ -64,9 +64,15 @@ export default function Run({
 
   // ── Error ──────────────────────────────────────────────────────────────────
   if (runStatus === 'error') {
+    const isAuth = error?.includes('401') || error?.includes('token')
     return (
       <div className="text-center py-8 space-y-3">
         <p className="text-red-500 text-sm">{error ?? 'Something went wrong'}</p>
+        {isAuth && (
+          <p className="text-xs text-amber-600">
+            Token mismatch — go to <strong>Settings</strong> and re-pair with the code the server printed.
+          </p>
+        )}
         <button onClick={onActivate} className="text-xs text-blue-500 underline">Try again</button>
         <StepLog steps={steps} />
       </div>

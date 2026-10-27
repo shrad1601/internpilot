@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Settings from './tabs/Settings'
 import Run from './tabs/Run'
+import ProfileTab from './tabs/Profile'
 import type { PageSnapshot, ProposedAction, StepEntry, RunStatus } from '../shared/types'
 import type { ExtensionMessage } from '../shared/messages'
 
@@ -155,7 +156,7 @@ export default function App() {
         )}
         {tab === 'history' && <Stub label="History" />}
         {tab === 'rules' && <Stub label="Rules" />}
-        {tab === 'profile' && <Stub label="Profile" />}
+        {tab === 'profile' && <ProfileTab />}
         {tab === 'settings' && <Settings onConnectionChange={checkConn} />}
       </main>
     </div>
