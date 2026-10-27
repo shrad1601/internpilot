@@ -20,12 +20,14 @@ VERSION = "0.2.0"
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     code = auth.init_pairing()
-    print(f"\n{'='*44}")
-    print(f"  InternPilot {VERSION} — server started")
-    print(f"  Pairing code : {code}")
-    print(f"  Code expires in 5 minutes")
-    print(f"  Listening on  127.0.0.1:8765")
-    print(f"{'='*44}\n")
+    import sys
+    print(f"\n{'='*44}", flush=True)
+    print(f"  InternPilot {VERSION} — server started", flush=True)
+    print(f"  Pairing code : {code}", flush=True)
+    print(f"  Code expires in 5 minutes", flush=True)
+    print(f"  Listening on  127.0.0.1:8765", flush=True)
+    print(f"{'='*44}\n", flush=True)
+    sys.stdout.flush()
     yield
 
 
@@ -49,7 +51,9 @@ def _require_token(x_ip_token: Optional[str] = Header(default=None)) -> str:
 # ── Health + pairing ──────────────────────────────────────────────────────────
 
 @app.get("/health", response_model=HealthResponse)
-async def health():
+async def health(token: str = Header(alias="x-ip-token", default=None)):
+    if token and not auth.verify_token(token):
+        raise HTTPException(status_code=401, detail="Invalid or missing token")
     return HealthResponse(status="ok", version=VERSION)
 
 

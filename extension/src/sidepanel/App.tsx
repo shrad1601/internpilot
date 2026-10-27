@@ -34,6 +34,7 @@ export default function App() {
     if (!token) { setConn('unpaired'); return }
     try {
       const res = await fetch(`${SERVER}/health`, { headers: { 'X-IP-Token': token } })
+      if (res.status === 401) { setConn('unpaired'); return }
       setConn(res.ok ? 'connected' : 'offline')
     } catch { setConn('offline') }
   }, [])
@@ -110,7 +111,7 @@ export default function App() {
   }[conn]
   const connLabel = {
     checking: 'Checking…', connected: 'Server connected',
-    offline: 'Server offline', unpaired: 'Not paired',
+    offline: 'Server offline', unpaired: 'Re-pair needed',
   }[conn]
 
   const tabs: Tab[] = ['run', 'history', 'rules', 'profile', 'settings']
