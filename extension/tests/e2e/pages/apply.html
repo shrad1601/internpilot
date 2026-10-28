@@ -1,0 +1,26 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Apply — Acme Software Intern</title></head>
+<body>
+<h1>Software Engineering Intern</h1>
+<form id="f" onsubmit="event.preventDefault(); window.__submitted = true">
+  <fieldset><legend>Contact Information</legend>
+    <label for="fn">First Name *</label><input id="fn" name="firstName" required>
+    <label for="ln">Last Name *</label><input id="ln" name="lastName" required>
+    <label for="em">Email</label><input id="em" type="email" name="email">
+    <label for="ph">Phone Number</label><input id="ph" type="tel" name="phone">
+  </fieldset>
+  <fieldset><legend>Application questions</legend>
+    <div class="q">
+      <div class="q-text">What is your favourite programming paradigm?</div>
+      <label><input type="radio" name="paradigm" value="fp"> Functional</label>
+      <label><input type="radio" name="paradigm" value="oop"> Object-oriented</label>
+    </div>
+    <label for="gpa">GPA</label><input id="gpa" name="gpa">
+    <label for="why">Why do you want this role?</label><textarea id="why" name="why"></textarea>
+  </fieldset>
+  <label for="pw">Password</label><input id="pw" type="password" name="password">
+  <textarea id="g-recaptcha-response" name="g-recaptcha-response"></textarea>
+  <button type="submit" id="submit">Submit application</button>
+  <button type="button" id="apply" onclick="window.__applied = true">Apply</button>
+</form>
+</body></html>

@@ -1,6 +1,16 @@
 import type { Action } from '../shared/types'
 
-const SUBMIT_RE = /submit|apply\s+now|send\s+application|finish|complete\s+application/i
+const SUBMIT_RE = /\b(submit|apply|send|finish|complete\s+application)\b/i
+
+export function looksLikeSubmit(el: Element): boolean {
+  const texts = [
+    el.textContent ?? '',
+    (el as HTMLInputElement).value ?? '',
+    el.getAttribute('aria-label') ?? '',
+    el.getAttribute('title') ?? '',
+  ]
+  return texts.some((t) => SUBMIT_RE.test(t))
+}
 
 export interface FillResult {
   success: boolean
@@ -15,8 +25,7 @@ export async function executeAction(action: Action): Promise<FillResult> {
   if (action.type === 'click') {
     const el = findElement(action.agentId)
     if (el) {
-      const text = el.textContent?.trim() || (el as HTMLInputElement).value || ''
-      if (SUBMIT_RE.test(text)) {
+      if (looksLikeSubmit(el)) {
         return { success: false, error: 'Refused: submit button — never clicked by agent' }
       }
       if (action.purpose === 'next' || action.purpose === 'add_entry' || action.purpose === 'expand') {
@@ -234,8 +243,7 @@ function fillCheckbox(el: Element, checked: boolean): FillResult {
 
 function clickElement(el: Element): FillResult {
   // Final submit guard at execution time
-  const text = el.textContent?.trim() || (el as HTMLInputElement).value || ''
-  if (SUBMIT_RE.test(text)) {
+  if (looksLikeSubmit(el)) {
     return { success: false, error: 'Refused: submit button — never clicked by agent' }
   }
   ;(el as HTMLElement).click()

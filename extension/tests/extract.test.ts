@@ -666,3 +666,30 @@ describe('captcha and id stamping', () => {
     expect(ids).not.toContain('ip-0')
   })
 })
+
+describe('radio question labels', () => {
+  it('uses the question text, not the enclosing section legend', () => {
+    const doc = new JSDOM(`<fieldset><legend>Application questions</legend>
+      <div><div>Are you willing to relocate?</div>
+        <label><input type="radio" name="r" value="y"> Yes</label>
+        <label><input type="radio" name="r" value="n"> No</label></div>
+      <label for="g">GPA</label><input id="g"></fieldset>`, { url: 'http://localhost/' }).window.document
+    const radio = extractPage(doc, 'http://localhost/').fields.find((f) => f.kind === 'radio_group')
+    expect(radio?.label).toBe('Are you willing to relocate?')
+  })
+
+  it('uses the legend when the fieldset is just this question', () => {
+    const doc = new JSDOM(`<fieldset><legend>Do you need sponsorship?</legend>
+      <label><input type="radio" name="s" value="y"> Yes</label>
+      <label><input type="radio" name="s" value="n"> No</label></fieldset>`, { url: 'http://localhost/' }).window.document
+    const radio = extractPage(doc, 'http://localhost/').fields.find((f) => f.kind === 'radio_group')
+    expect(radio?.label).toBe('Do you need sponsorship?')
+  })
+
+  it('returns fields in page order', () => {
+    const doc = new JSDOM(`<label for="a">First</label><input id="a">
+      <div>Pick one</div><label><input type="radio" name="p" value="1"> One</label><label><input type="radio" name="p" value="2"> Two</label>
+      <label for="b">Last</label><input id="b">`, { url: 'http://localhost/' }).window.document
+    expect(extractPage(doc, 'http://localhost/').fields.map((f) => f.label)).toEqual(['First', 'Pick one', 'Last'])
+  })
+})

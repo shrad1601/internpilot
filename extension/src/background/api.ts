@@ -1,6 +1,6 @@
 import type { PageSnapshot, ProposedAction, StepEntry } from '../shared/types'
+import { SERVER as BASE } from '../shared/config'
 
-const BASE = 'http://127.0.0.1:8765'
 
 async function getToken(): Promise<string | null> {
   return new Promise((resolve) =>

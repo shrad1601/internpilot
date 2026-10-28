@@ -1,0 +1,12 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Apply (web components)</title></head>
+<body>
+<x-field></x-field>
+<script>
+  customElements.define('x-field', class extends HTMLElement {
+    connectedCallback() {
+      const root = this.attachShadow({ mode: 'open' })
+      root.innerHTML = '<input id="sh-email" type="email" aria-label="Email address">'
+    }
+  })
+</script>
+</body></html>

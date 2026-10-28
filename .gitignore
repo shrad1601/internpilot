@@ -29,3 +29,8 @@ data/
 # IDE
 .vscode/
 .idea/
+
+# E2E
+extension/dist-e2e/
+extension/test-results/
+extension/playwright-report/

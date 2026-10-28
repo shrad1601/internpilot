@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
+import { SERVER, SERVER_HOST } from '../../shared/config'
 
-const SERVER = 'http://127.0.0.1:8765'
 
 interface Props {
   onConnectionChange: () => void
@@ -40,7 +40,7 @@ export default function Settings({ onConnectionChange }: Props) {
       setPaired(true)
       onConnectionChange()
     } catch {
-      setError('Cannot reach server. Make sure it is running on port 8765.')
+      setError('Cannot reach server. Make sure it is running.')
     } finally {
       setPairing(false)
     }
@@ -108,7 +108,7 @@ export default function Settings({ onConnectionChange }: Props) {
         <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
           Server
         </h2>
-        <p className="text-xs text-gray-500 font-mono">127.0.0.1:8765</p>
+        <p className="text-xs text-gray-500 font-mono">{SERVER_HOST}</p>
       </section>
 
       <section className="space-y-2">

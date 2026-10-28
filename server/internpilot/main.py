@@ -72,6 +72,8 @@ async def pair(req: PairRequest):
     token = auth.pair_with_code(req.code)
     if token is None:
         raise HTTPException(status_code=400, detail="Invalid or expired code")
+    # Have a code ready for the next pairing without a restart.
+    _print_code(auth.init_pairing(), "paired — code for the next pairing")
     return PairResponse(token=token)
 
 

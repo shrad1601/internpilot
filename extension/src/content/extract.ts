@@ -86,6 +86,8 @@ function isCandidate(el: Element): boolean {
   }
   if (tag === 'SELECT' || tag === 'TEXTAREA') return true
   if (ce === 'true') return true
+  // ARIA wrappers around native inputs are represented by those inputs.
+  if ((role === 'radiogroup' || role === 'listbox') && el.querySelector('input, select')) return false
   if (role === 'combobox' || role === 'listbox' || role === 'radiogroup' ||
       role === 'checkbox' || role === 'switch') return true
   return false
@@ -359,23 +361,66 @@ function radioOptionLabel(radio: HTMLInputElement, doc: Document): string {
   return radio.value
 }
 
+function commonContainer(els: Element[]): Element | null {
+  let node = els[0].parentElement
+  while (node && !els.every((e) => node!.contains(e))) node = node.parentElement
+  return node
+}
+
+// The question a radio group answers: its own label, not an enclosing section's legend.
+function radioQuestionLabel(radios: HTMLInputElement[], doc: Document): { label: string; sources: string[] } {
+  const container = commonContainer(radios)
+  if (!container) return { label: '', sources: [] }
+
+  const group = radios[0].closest('[role="radiogroup"]')
+  if (group) {
+    const lby = group.getAttribute('aria-labelledby')
+    const t = lby
+      ? cleanLabel(lby.split(/\s+/).map((id) => doc.getElementById(id)?.textContent ?? '').join(' '))
+      : cleanLabel(group.getAttribute('aria-label') ?? '')
+    if (t) return { label: t, sources: [lby ? 'aria-labelledby' : 'aria-label'] }
+  }
+
+  // A fieldset that holds only this group: its legend is the question.
+  const fs = radios[0].closest('fieldset')
+  if (fs) {
+    const controlsInFs = fs.querySelectorAll('input, select, textarea').length
+    const legend = fs.querySelector(':scope > legend')
+    if (legend && controlsInFs === radios.length) {
+      const t = cleanLabel(legend.textContent ?? '')
+      if (t) return { label: t, sources: ['legend'] }
+    }
+  }
+
+  // Text that precedes the options inside their shared container.
+  const firstOptionChild = Array.from(container.children).find((c) => radios.some((r) => c.contains(r)))
+  let prev = firstOptionChild?.previousElementSibling ?? null
+  while (prev) {
+    if (!prev.querySelector('input, select, textarea')) {
+      const t = cleanLabel(prev.textContent ?? '')
+      if (t) return { label: t, sources: ['question-text'] }
+    }
+    prev = prev.previousElementSibling
+  }
+  const before = container.previousElementSibling
+  if (before && !before.querySelector('input, select, textarea') && !/^LEGEND$/i.test(before.tagName)) {
+    const t = cleanLabel(before.textContent ?? '')
+    if (t) return { label: t, sources: ['question-text'] }
+  }
+
+  // Last resort: an enclosing section legend.
+  const outerLegend = fs?.querySelector(':scope > legend')
+  const t = cleanLabel(outerLegend?.textContent ?? '')
+  return t ? { label: t, sources: ['legend'] } : { label: '', sources: [] }
+}
+
 function groupRadios(
   radios: HTMLInputElement[],
   frameId: number,
   doc: Document,
 ): Field {
   const first = radios[0]
-  const fs = first.closest('fieldset')
-  let label = ''
-  let labelSources: string[] = []
-
-  if (fs) {
-    const legend = fs.querySelector('legend')
-    if (legend) {
-      label = cleanLabel(legend.textContent ?? '')
-      labelSources = ['legend']
-    }
-  }
+  let { label, sources: labelSources } = radioQuestionLabel(radios, doc)
   if (!label) {
     const resolved = resolveLabel(first, doc)
     label = resolved.label
@@ -603,6 +648,14 @@ export function extractPage(doc: Document, url: string, frameId = 0): FrameSnaps
       disabled: (el as HTMLInputElement).disabled ?? false,
     })
   }
+
+  // Present fields in the order they appear on the page.
+  const position = new Map<string, number>()
+  allElements.forEach((el, i) => {
+    const id = el.getAttribute(IP_ID_ATTR)
+    if (id && !position.has(id)) position.set(id, i)
+  })
+  fields.sort((a, b) => (position.get(a.agentId) ?? 0) - (position.get(b.agentId) ?? 0))
 
   const { jobTitle, company, jobDescription } = jobInfo(doc)
 

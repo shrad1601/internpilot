@@ -27,7 +27,7 @@ export default function Run({
   const currentAction = actions[currentIdx]
 
   // ── Idle ───────────────────────────────────────────────────────────────────
-  if (runStatus === 'idle' || (!snapshot && !isActive)) {
+  if (runStatus === 'idle' || (!snapshot && !isActive && runStatus !== 'error')) {
     return (
       <div className="text-center py-10 space-y-4">
         {!serverConnected && (
@@ -81,7 +81,7 @@ export default function Run({
 
   // ── Done / stopped ─────────────────────────────────────────────────────────
   if (runStatus === 'done' || runStatus === 'stopped') {
-    const filledCount = steps.filter((s) => s.kind === 'fill' && s.status === 'ok').length
+    const filledCount = steps.filter((s) => (s.kind === 'fill' || s.kind === 'answer') && s.status === 'ok').length
     return (
       <div className="space-y-4">
         <div className="text-center py-4 space-y-1">
@@ -143,6 +143,7 @@ export default function Run({
             key={currentIdx}
             idx={currentIdx}
             proposed={currentAction}
+            fieldLabel={snapshot?.fields.find((f) => f.agentId === currentAction.action.agentId)?.label}
             onApprove={onApprove}
             onReject={onReject}
             onAnswer={onAnswer}

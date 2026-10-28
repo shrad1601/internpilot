@@ -94,3 +94,12 @@ async def test_wrong_token_rejected():
     code = auth.get_current_code()
     auth.pair_with_code(code)
     assert not auth.verify_token("totally-wrong-token")
+
+
+@pytest.mark.asyncio
+async def test_new_code_ready_after_pairing(client):
+    first = auth.init_pairing()
+    assert (await client.post("/pair", json={"code": first})).status_code == 200
+    nxt = auth.get_current_code()
+    assert nxt is not None
+    assert (await client.post("/pair", json={"code": nxt})).status_code == 200

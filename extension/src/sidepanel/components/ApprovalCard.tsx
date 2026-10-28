@@ -4,6 +4,7 @@ import type { ProposedAction } from '../../shared/types'
 interface Props {
   idx: number
   proposed: ProposedAction
+  fieldLabel?: string
   onApprove: (idx: number, editedValue?: string) => void
   onReject: (idx: number) => void
   onAnswer: (idx: number, value: string, remember: boolean) => void
@@ -24,7 +25,7 @@ const SENSITIVITY_COLORS: Record<string, string> = {
   high: 'bg-red-100 text-red-700',
 }
 
-export default function ApprovalCard({ idx, proposed, onApprove, onReject, onAnswer }: Props) {
+export default function ApprovalCard({ idx, proposed, fieldLabel, onApprove, onReject, onAnswer }: Props) {
   const { action, source, confidence, sensitivity } = proposed
   const [editedValue, setEditedValue] = useState<string>('')
   const [answered, setAnswered] = useState('')
@@ -94,6 +95,7 @@ export default function ApprovalCard({ idx, proposed, onApprove, onReject, onAns
       <div className="border border-gray-200 rounded-lg p-3 flex items-center gap-3 bg-gray-50">
         <span className="text-gray-400 text-base">⏭</span>
         <div className="flex-1 min-w-0">
+          {fieldLabel && <p className="text-xs font-medium text-gray-700 truncate">{fieldLabel}</p>}
           <p className="text-xs text-gray-500 truncate">
             Skip: {action.reason}
           </p>
@@ -129,6 +131,7 @@ export default function ApprovalCard({ idx, proposed, onApprove, onReject, onAns
           <span>⚠️</span> Sensitive field — review carefully
         </div>
       )}
+      {fieldLabel && <p className="text-sm font-medium text-gray-900" data-testid="field-label">{fieldLabel}</p>}
       <div className="flex items-start gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">

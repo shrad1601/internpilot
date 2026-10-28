@@ -5,11 +5,11 @@ import ProfileTab from './tabs/Profile'
 import type { PageSnapshot, ProposedAction, StepEntry, RunStatus } from '../shared/types'
 import type { ExtensionMessage } from '../shared/messages'
 import type { RunState } from '../background/runMachine'
+import { SERVER } from '../shared/config'
 
 type Tab = 'run' | 'history' | 'rules' | 'profile' | 'settings'
 type ConnectionStatus = 'checking' | 'connected' | 'offline' | 'unpaired'
 
-const SERVER = 'http://127.0.0.1:8765'
 
 async function getToken(): Promise<string | null> {
   return new Promise((resolve) =>
@@ -101,7 +101,8 @@ export default function App() {
   }, [checkConn])
 
   async function handleActivate() {
-    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true })
+    const win = await chrome.windows.getLastFocused({ windowTypes: ['normal'] })
+    const [activeTab] = await chrome.tabs.query({ active: true, windowId: win.id })
     if (!activeTab?.id) return
     setRunStatus('reading')
     setRunError(undefined)

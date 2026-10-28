@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
+import { SERVER } from '../../shared/config'
 
-const SERVER = 'http://127.0.0.1:8765'
 
 async function getToken(): Promise<string | null> {
   return new Promise((r) =>
