@@ -7,9 +7,10 @@ interface PongMsg { kind: 'PONG' }
 
 interface StartRunMsg { kind: 'START_RUN'; tabId: number }
 interface StopMsg { kind: 'STOP' }
+interface GetStateMsg { kind: 'GET_STATE' }
 
 // Panel approves a single action in the queue
-interface ApproveActionMsg { kind: 'APPROVE_ACTION'; idx: number }
+interface ApproveActionMsg { kind: 'APPROVE_ACTION'; idx: number; editedValue?: string }
 // Panel skips (rejects) a single action
 interface RejectActionMsg { kind: 'REJECT_ACTION'; idx: number }
 // Panel submits an answer to an ask_user
@@ -21,6 +22,7 @@ interface RunStatusMsg {
   kind: 'RUN_STATUS'
   status: RunStatus
   message?: string
+  currentIdx?: number
 }
 
 interface RunUpdateMsg {
@@ -72,7 +74,7 @@ interface ExtErrorMsg { kind: 'EXT_ERROR'; message: string }
 
 export type ExtensionMessage =
   | PingMsg | PongMsg
-  | StartRunMsg | StopMsg
+  | StartRunMsg | StopMsg | GetStateMsg
   | ApproveActionMsg | RejectActionMsg | AnswerQuestionMsg
   | RunStatusMsg | RunUpdateMsg | PlanReadyMsg | StepLoggedMsg | ActionFilledMsg
   | ExtractRequestMsg | ExtractResponseMsg

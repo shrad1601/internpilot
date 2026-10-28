@@ -106,8 +106,14 @@ async def plan_run(
     token: str = Header(alias="x-ip-token", default=None),
 ):
     _require_token(token)
-    if runs.get(run_id) is None:
+    rec = runs.get(run_id)
+    if rec is None:
         raise HTTPException(status_code=404, detail="Run not found")
+    rec.fields = [
+        f.model_dump(include={"agentId", "kind", "label", "labelSources", "sectionHeading",
+                              "helpText", "required", "visible", "options"})
+        for f in body.snapshot.fields
+    ]
 
     proposed = resolver.resolve(body.snapshot)
 
@@ -182,4 +188,5 @@ async def get_run(run_id: str, token: str = Header(alias="x-ip-token", default=N
         "startedAt": rec.started_at,
         "endedAt": rec.ended_at,
         "steps": [s.model_dump() for s in rec.steps],
+        "fields": rec.fields,
     }

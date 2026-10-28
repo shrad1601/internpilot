@@ -16,7 +16,7 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendRespon
       break
 
     case 'APPROVE_ACTION':
-      machine.approveAction(msg.idx).catch(console.error)
+      machine.approveAction(msg.idx, msg.editedValue).catch(console.error)
       break
 
     case 'REJECT_ACTION':
@@ -26,6 +26,10 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendRespon
     case 'ANSWER_QUESTION':
       machine.answerQuestion(msg.idx, msg.value, msg.remember).catch(console.error)
       break
+
+    case 'GET_STATE':
+      machine.getState().then(sendResponse).catch(() => sendResponse(null))
+      return true
 
     case 'PING':
       sendResponse({ kind: 'PONG' } satisfies ExtensionMessage)

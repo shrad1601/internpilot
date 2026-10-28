@@ -4,6 +4,7 @@ import Run from './tabs/Run'
 import ProfileTab from './tabs/Profile'
 import type { PageSnapshot, ProposedAction, StepEntry, RunStatus } from '../shared/types'
 import type { ExtensionMessage } from '../shared/messages'
+import type { RunState } from '../background/runMachine'
 
 type Tab = 'run' | 'history' | 'rules' | 'profile' | 'settings'
 type ConnectionStatus = 'checking' | 'connected' | 'offline' | 'unpaired'
@@ -62,6 +63,7 @@ export default function App() {
     const listener = (msg: ExtensionMessage) => {
       if (msg.kind === 'RUN_STATUS') {
         setRunStatus(msg.status)
+        if (msg.currentIdx !== undefined) setCurrentIdx(msg.currentIdx)
         if (msg.status === 'error') setRunError(msg.message)
         if (msg.status === 'idle' || msg.status === 'reading') {
           setActions([])
@@ -81,11 +83,20 @@ export default function App() {
       if (msg.kind === 'STEP_LOGGED') {
         setSteps((prev) => [...prev, msg.entry])
       }
-      if (msg.kind === 'ACTION_FILLED') {
-        setCurrentIdx((i) => i + 1)
-      }
     }
     chrome.runtime.onMessage.addListener(listener)
+    // Restore an in-progress run if the panel was closed and reopened.
+    chrome.runtime.sendMessage({ kind: 'GET_STATE' } satisfies ExtensionMessage)
+      .then((s: RunState | null) => {
+        if (!s) return
+        setRunStatus(s.state)
+        setSnapshot(s.snapshot)
+        setActions(s.actions)
+        setCurrentIdx(s.currentIdx)
+        setSteps(s.stepLog)
+        setRunError(s.error)
+      })
+      .catch(() => {})
     return () => chrome.runtime.onMessage.removeListener(listener)
   }, [checkConn])
 
@@ -112,7 +123,7 @@ export default function App() {
       })
       setActions(updated)
     }
-    chrome.runtime.sendMessage({ kind: 'APPROVE_ACTION', idx } satisfies ExtensionMessage)
+    chrome.runtime.sendMessage({ kind: 'APPROVE_ACTION', idx, editedValue } satisfies ExtensionMessage)
   }
 
   function handleReject(idx: number) {

@@ -21,6 +21,7 @@ class RunRecord:
         self.status = "active"
         self.steps: list[StepEntry] = []
         self.seq = 0
+        self.fields: list[dict] = []
 
 
 _store: dict[str, RunRecord] = {}

@@ -2,7 +2,7 @@
  * Run state machine — persisted in chrome.storage.session so it survives
  * service worker restarts (MV3 workers are short-lived).
  */
-import type { PageSnapshot, ProposedAction, FrameSnapshot, StepEntry, RunStatus, Action } from '../shared/types'
+import type { PageSnapshot, ProposedAction, FrameSnapshot, StepEntry, RunStatus, Action, FieldKind } from '../shared/types'
 import type { ExtensionMessage } from '../shared/messages'
 import * as api from './api'
 
@@ -105,7 +105,7 @@ export async function startRun(tabId: number): Promise<void> {
     await saveState(initial)
 
     broadcast({ kind: 'PLAN_READY', runId, actions })
-    broadcast({ kind: 'RUN_STATUS', status: 'awaiting_approval' })
+    broadcast({ kind: 'RUN_STATUS', status: 'awaiting_approval', currentIdx: 0 })
   } catch (err) {
     if ((err as Error).name === 'AbortError') return
     const msg = String(err)
@@ -115,7 +115,7 @@ export async function startRun(tabId: number): Promise<void> {
   }
 }
 
-export async function approveAction(idx: number): Promise<void> {
+export async function approveAction(idx: number, editedValue?: string): Promise<void> {
   const s = await loadState()
   if (!s || s.state !== 'awaiting_approval') return
   if (idx !== s.currentIdx) return
@@ -123,7 +123,9 @@ export async function approveAction(idx: number): Promise<void> {
   const proposed = s.actions[idx]
   if (!proposed) return
 
-  const action = proposed.action
+  const action = proposed.action.type === 'fill' && editedValue !== undefined
+    ? { ...proposed.action, value: editedValue }
+    : proposed.action
   if (action.type === 'ask_user') return // waiting for an answer, not approve
   if (action.type === 'skip') {
     addStep(s, { kind: 'skip', status: 'skipped', agentId: action.agentId, message: action.reason })
@@ -133,7 +135,7 @@ export async function approveAction(idx: number): Promise<void> {
 
   s.state = 'filling'
   await saveState(s)
-  broadcast({ kind: 'RUN_STATUS', status: 'filling' })
+  broadcast({ kind: 'RUN_STATUS', status: 'filling', currentIdx: s.currentIdx })
 
   const signal = _abortController?.signal
 
@@ -163,7 +165,7 @@ export async function approveAction(idx: number): Promise<void> {
     if ((err as Error).name === 'AbortError') return
     s.state = 'awaiting_approval'
     await saveState(s)
-    broadcast({ kind: 'RUN_STATUS', status: 'awaiting_approval' })
+    broadcast({ kind: 'RUN_STATUS', status: 'awaiting_approval', currentIdx: s.currentIdx })
   }
 }
 
@@ -189,11 +191,11 @@ export async function answerQuestion(idx: number, value: string, _remember: bool
   const action = proposed.action
   const fieldLabel = s.snapshot?.fields.find((f) => f.agentId === action.agentId)?.label ?? ''
 
-  // Convert ask_user answer into a fill action and execute it
-  const fillAction = { type: 'fill' as const, agentId: action.agentId, value }
+  const field = s.snapshot?.fields.find((f) => f.agentId === action.agentId)
+  const fillAction = answerToAction(field?.kind, action.agentId, value)
   s.state = 'filling'
   await saveState(s)
-  broadcast({ kind: 'RUN_STATUS', status: 'filling' })
+  broadcast({ kind: 'RUN_STATUS', status: 'filling', currentIdx: s.currentIdx })
 
   const signal = _abortController?.signal
   const frameId = _frameIdForAgentId(s.snapshot, action.agentId)
@@ -251,7 +253,7 @@ async function advance(s: RunState): Promise<void> {
   }
   s.state = 'awaiting_approval'
   await saveState(s)
-  broadcast({ kind: 'RUN_STATUS', status: 'awaiting_approval' })
+  broadcast({ kind: 'RUN_STATUS', status: 'awaiting_approval', currentIdx: s.currentIdx })
 }
 
 function addStep(
@@ -269,6 +271,15 @@ function addStep(
 
 function broadcast(msg: ExtensionMessage): void {
   chrome.runtime.sendMessage(msg).catch(() => {})
+}
+
+export function answerToAction(kind: FieldKind | undefined, agentId: string, value: string): Action {
+  switch (kind) {
+    case 'radio_group': return { type: 'choose_radio', agentId, optionLabel: value }
+    case 'select': return { type: 'select', agentId, optionLabel: value }
+    case 'checkbox': return { type: 'check', agentId, checked: /^(yes|y|true|1|checked)$/i.test(value.trim()) }
+    default: return { type: 'fill', agentId, value }
+  }
 }
 
 function _frameIdForAgentId(snapshot: PageSnapshot | null, agentId: string): number {
