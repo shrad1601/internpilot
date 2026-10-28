@@ -59,8 +59,13 @@ export async function startRun(tabId: number): Promise<void> {
   broadcast({ kind: 'RUN_STATUS', status: 'reading' })
 
   try {
-    // 1. Extract all frames
-    const snapshot = await extractAllFrames(tabId, signal)
+    // 1. Extract all frames — retry up to 3× with backoff for React-rendered forms
+    let snapshot = await extractAllFrames(tabId, signal)
+    for (let attempt = 1; attempt < 3 && snapshot.fields.length === 0; attempt++) {
+      if (signal.aborted) return
+      await new Promise((r) => setTimeout(r, 1500 * attempt))
+      snapshot = await extractAllFrames(tabId, signal)
+    }
     if (signal.aborted) return
 
     initial.snapshot = snapshot
