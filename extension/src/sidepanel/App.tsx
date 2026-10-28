@@ -39,6 +39,24 @@ export default function App() {
     } catch { setConn('offline') }
   }, [])
 
+  const [starting, setStarting] = useState(false)
+  const [startError, setStartError] = useState<string | null>(null)
+
+  async function startServer() {
+    setStarting(true)
+    setStartError(null)
+    try {
+      const res = await chrome.runtime.sendNativeMessage('com.internpilot.launcher', { action: 'start' }) as
+        { ok: boolean; error?: string } | undefined
+      if (!res?.ok) setStartError(res?.error ?? 'Could not start server')
+    } catch {
+      setStartError('Launcher not installed — run server/install_native_host.sh')
+    } finally {
+      setStarting(false)
+      void checkConn()
+    }
+  }
+
   useEffect(() => {
     checkConn()
     const listener = (msg: ExtensionMessage) => {
@@ -124,8 +142,18 @@ export default function App() {
           <div className="flex items-center gap-1.5">
             <span className={`w-2 h-2 rounded-full ${connDot}`} />
             <span className="text-xs text-gray-500">{connLabel}</span>
+            {conn === 'offline' && (
+              <button
+                onClick={startServer}
+                disabled={starting}
+                className="ml-1 text-xs bg-blue-600 text-white px-2 py-0.5 rounded disabled:opacity-50 hover:bg-blue-700"
+              >
+                {starting ? 'Starting…' : 'Start server'}
+              </button>
+            )}
           </div>
         </div>
+        {startError && <p className="text-xs text-red-500 mb-1">{startError}</p>}
         <nav className="flex gap-0.5">
           {tabs.map((t) => (
             <button key={t} onClick={() => setTab(t)}

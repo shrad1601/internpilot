@@ -3,7 +3,7 @@
   "name": "InternPilot",
   "version": "0.1.0",
   "description": "Human-in-the-loop job application copilot",
-  "permissions": ["sidePanel", "storage", "activeTab", "scripting", "tabs"],
+  "permissions": ["sidePanel", "storage", "activeTab", "scripting", "tabs", "nativeMessaging"],
   "host_permissions": ["<all_urls>", "http://127.0.0.1:8765/*"],
   "background": {
     "service_worker": "src/background/index.ts",

@@ -31,7 +31,7 @@ export default function Run({
     return (
       <div className="text-center py-10 space-y-4">
         {!serverConnected && (
-          <p className="text-amber-600 text-xs">Server offline — start it first.</p>
+          <p className="text-amber-600 text-xs">Server offline — click Start server at the top.</p>
         )}
         <p className="text-gray-500 text-sm">
           Navigate to a job application page, then press Activate.
