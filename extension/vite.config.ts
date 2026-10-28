@@ -8,6 +8,9 @@ export default defineConfig({
     react(),
     crx({ manifest }),
   ],
+  define: {
+    __BUILD_TIME__: JSON.stringify(new Date().toLocaleString('en-SG', { hour12: false })),
+  },
   build: {
     minify: false,
     sourcemap: true,

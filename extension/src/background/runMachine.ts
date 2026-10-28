@@ -86,16 +86,23 @@ export async function startRun(tabId: number): Promise<void> {
     const actions = await api.planRun(runId, snapshot, signal)
     if (signal.aborted) return
 
-    initial.actions = actions
-    initial.state = 'awaiting_approval'
-    initial.currentIdx = 0
-    await saveState(initial)
-
     addStep(initial, {
       kind: 'read_page',
       status: 'ok',
       message: `Read page — found ${snapshot.fields.filter((f) => f.visible).length} fields`,
     })
+
+    initial.actions = actions
+    initial.currentIdx = 0
+    if (actions.length === 0) {
+      initial.state = 'done'
+      await saveState(initial)
+      await api.finishRun(runId, 'completed').catch(() => {})
+      broadcast({ kind: 'RUN_STATUS', status: 'done', message: 'Nothing to fill on this page' })
+      return
+    }
+    initial.state = 'awaiting_approval'
+    await saveState(initial)
 
     broadcast({ kind: 'PLAN_READY', runId, actions })
     broadcast({ kind: 'RUN_STATUS', status: 'awaiting_approval' })

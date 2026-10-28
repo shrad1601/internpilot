@@ -110,6 +110,13 @@ export default function Settings({ onConnectionChange }: Props) {
         </h2>
         <p className="text-xs text-gray-500 font-mono">127.0.0.1:8765</p>
       </section>
+
+      <section className="space-y-2">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+          Extension build
+        </h2>
+        <p className="text-xs text-gray-500 font-mono">{__BUILD_TIME__}</p>
+      </section>
     </div>
   )
 }
