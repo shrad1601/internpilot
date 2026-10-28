@@ -640,3 +640,29 @@ describe('ID counter isolation', () => {
     expect(id1).toBe(id2) // same counter start → same id
   })
 })
+
+// ── Safety + stamping ─────────────────────────────────────────────────────────
+
+describe('captcha and id stamping', () => {
+  function docFrom(html: string): Document {
+    return new JSDOM(html, { url: 'http://localhost/' }).window.document
+  }
+
+  it('never treats captcha response fields as form fields', () => {
+    const doc = docFrom(`<form>
+      <label for="e">Email</label><input id="e" type="email">
+      <textarea id="g-recaptcha-response-100000" name="g-recaptcha-response"></textarea>
+      <textarea name="h-captcha-response"></textarea>
+    </form>`)
+    const snap = extractPage(doc, 'http://localhost/')
+    expect(snap.fields.map((f) => f.label)).toEqual(['Email'])
+  })
+
+  it('re-stamps elements carrying ids from a stale script instance', () => {
+    const doc = docFrom(`<label for="a">First Name</label><input id="a" data-ip-id="ip-0">
+      <label for="b">Last Name</label><input id="b">`)
+    const ids = extractPage(doc, 'http://localhost/').fields.map((f) => f.agentId)
+    expect(new Set(ids).size).toBe(2)
+    expect(ids).not.toContain('ip-0')
+  })
+})

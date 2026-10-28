@@ -125,7 +125,6 @@ export function removeStatusBar(): void {
 }
 
 // Per-field status colors during a fill run
-const _outlineEls = new Map<string, HTMLElement>()
 
 export function updateFieldStatus(agentId: string, status: 'proposed' | 'waiting' | 'filled' | 'blocked' | 'skip'): void {
   const sr = shadowRoot()

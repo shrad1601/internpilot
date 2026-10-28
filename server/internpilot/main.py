@@ -17,17 +17,21 @@ logger = logging.getLogger(__name__)
 VERSION = "0.2.0"
 
 
+def _print_code(code: str, headline: str) -> None:
+    print(f"\n{'='*44}", flush=True)
+    print(f"  InternPilot {VERSION} — {headline}", flush=True)
+    print(f"  Pairing code : {code}", flush=True)
+    print("  Code expires in 5 minutes", flush=True)
+    print("  Listening on  127.0.0.1:8765", flush=True)
+    print(f"{'='*44}\n", flush=True)
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    restored = auth.load_persisted_token()
     code = auth.init_pairing()
-    import sys
-    print(f"\n{'='*44}", flush=True)
-    print(f"  InternPilot {VERSION} — server started", flush=True)
-    print(f"  Pairing code : {code}", flush=True)
-    print(f"  Code expires in 5 minutes", flush=True)
-    print(f"  Listening on  127.0.0.1:8765", flush=True)
-    print(f"{'='*44}\n", flush=True)
-    sys.stdout.flush()
+    headline = "server started (existing pairing restored)" if restored else "server started"
+    _print_code(code, headline)
     yield
 
 
@@ -59,6 +63,12 @@ async def health(token: str = Header(alias="x-ip-token", default=None)):
 
 @app.post("/pair", response_model=PairResponse)
 async def pair(req: PairRequest):
+    if auth.code_expired():
+        _print_code(auth.init_pairing(), "new pairing code (previous one expired)")
+        raise HTTPException(
+            status_code=400,
+            detail="Code expired — a new code was printed to the server log",
+        )
     token = auth.pair_with_code(req.code)
     if token is None:
         raise HTTPException(status_code=400, detail="Invalid or expired code")

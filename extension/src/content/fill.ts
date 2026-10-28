@@ -52,7 +52,19 @@ export async function executeAction(action: Action): Promise<FillResult> {
 // ── Finders ───────────────────────────────────────────────────────────────────
 
 function findElement(agentId: string): Element | null {
-  return document.querySelector(`[data-ip-id="${agentId}"]`)
+  const sel = `[data-ip-id="${CSS.escape(agentId)}"]`
+  const search = (root: Document | ShadowRoot): Element | null => {
+    const hit = root.querySelector(sel)
+    if (hit) return hit
+    for (const el of root.querySelectorAll('*')) {
+      if (el.shadowRoot) {
+        const found = search(el.shadowRoot)
+        if (found) return found
+      }
+    }
+    return null
+  }
+  return search(document)
 }
 
 // ── Scroll + visual feedback ──────────────────────────────────────────────────

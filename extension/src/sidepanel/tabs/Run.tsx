@@ -1,4 +1,4 @@
-import type { PageSnapshot, ProposedAction, StepEntry, RunStatus, Field } from '../../shared/types'
+import type { PageSnapshot, ProposedAction, StepEntry, RunStatus } from '../../shared/types'
 import ApprovalCard from '../components/ApprovalCard'
 import StepLog from '../components/StepLog'
 import StopButton from '../components/StopButton'

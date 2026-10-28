@@ -58,6 +58,37 @@ async def test_token_verified_after_pairing(client):
 
 
 @pytest.mark.asyncio
+async def test_token_survives_restart(client):
+    code = auth.init_pairing()
+    token = (await client.post("/pair", json={"code": code})).json()["token"]
+    assert oct(auth.TOKEN_PATH.stat().st_mode & 0o777) == "0o600"
+
+    auth.reset()  # simulate process restart
+    assert not auth.verify_token(token)
+    assert auth.load_persisted_token()
+    assert auth.verify_token(token)
+
+
+@pytest.mark.asyncio
+async def test_expired_code_issues_new_code(client):
+    auth.init_pairing()
+    auth._pending.created_at -= 400
+    old = auth._pending.code
+    res = await client.post("/pair", json={"code": old})
+    assert res.status_code == 400
+    assert "new code" in res.json()["detail"]
+    fresh = auth.get_current_code()
+    assert fresh is not None
+    assert (await client.post("/pair", json={"code": fresh})).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_health_rejects_stale_token(client):
+    res = await client.get("/health", headers={"x-ip-token": "stale"})
+    assert res.status_code == 401
+
+
+@pytest.mark.asyncio
 async def test_wrong_token_rejected():
     auth.init_pairing()
     code = auth.get_current_code()

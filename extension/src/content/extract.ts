@@ -1,6 +1,8 @@
 import type { Field, FieldKind, FieldOption, PageButton, FrameSnapshot, ATSKind } from '../shared/types'
 
 const IP_ID_ATTR = 'data-ip-id'
+// Per-instance prefix so a re-injected script never reuses ids stamped by a stale one.
+const ID_PREFIX = Math.random().toString(36).slice(2, 7)
 let _idCounter = 0
 
 export function resetIdCounter() { _idCounter = 0 }
@@ -9,8 +11,8 @@ export function resetIdCounter() { _idCounter = 0 }
 
 function getOrStamp(el: Element): string {
   const existing = el.getAttribute(IP_ID_ATTR)
-  if (existing) return existing
-  const id = `ip-${_idCounter++}`
+  if (existing?.startsWith(`ip-${ID_PREFIX}-`)) return existing
+  const id = `ip-${ID_PREFIX}-${_idCounter++}`
   el.setAttribute(IP_ID_ATTR, id)
   return id
 }
@@ -68,8 +70,12 @@ function isHidden(el: Element): boolean {
 
 const BLOCKED_INPUT_TYPES = new Set(['submit', 'button', 'reset', 'image'])
 
+const CAPTCHA_RE = /recaptcha|hcaptcha|h-captcha|cf-turnstile|captcha/i
+
 function isCandidate(el: Element): boolean {
   const tag = el.tagName.toUpperCase()
+  const ident = `${el.getAttribute('name') ?? ''} ${el.getAttribute('id') ?? ''} ${el.getAttribute('class') ?? ''}`
+  if (CAPTCHA_RE.test(ident)) return false
   const role = el.getAttribute('role')
   const ce = el.getAttribute('contenteditable')
 

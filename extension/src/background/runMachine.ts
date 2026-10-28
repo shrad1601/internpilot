@@ -2,7 +2,7 @@
  * Run state machine — persisted in chrome.storage.session so it survives
  * service worker restarts (MV3 workers are short-lived).
  */
-import type { PageSnapshot, ProposedAction, FrameSnapshot, StepEntry, RunStatus } from '../shared/types'
+import type { PageSnapshot, ProposedAction, FrameSnapshot, StepEntry, RunStatus, Action } from '../shared/types'
 import type { ExtensionMessage } from '../shared/messages'
 import * as api from './api'
 
@@ -31,10 +31,6 @@ async function saveState(s: RunState): Promise<void> {
 async function loadState(): Promise<RunState | null> {
   const data = await chrome.storage.session.get('runState')
   return (data.runState as RunState) ?? null
-}
-
-async function clearState(): Promise<void> {
-  await chrome.storage.session.remove('runState')
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -67,6 +63,9 @@ export async function startRun(tabId: number): Promise<void> {
       snapshot = await extractAllFrames(tabId, signal)
     }
     if (signal.aborted) return
+    if (!snapshot.fields.some((f) => f.visible)) {
+      throw new Error('No form fields found on this page. Open the application form step and press Activate again.')
+    }
 
     initial.snapshot = snapshot
     await saveState(initial)
@@ -274,7 +273,7 @@ function _frameIdForAgentId(snapshot: PageSnapshot | null, agentId: string): num
 async function sendFillToFrame(
   tabId: number,
   frameId: number,
-  action: ExtensionMessage extends { kind: 'FILL_ACTION'; action: infer A } ? A : never,
+  action: Action,
   runId: string,
   idx: number,
   signal?: AbortSignal,
@@ -312,17 +311,43 @@ async function extractAllFrames(tabId: number, signal: AbortSignal): Promise<Pag
   const snapshots: FrameSnapshot[] = []
   for (const frameId of frameIds) {
     if (signal.aborted) throw new DOMException('AbortError', 'AbortError')
-    try {
-      const resp = await chrome.tabs.sendMessage(
-        tabId,
-        { kind: 'EXTRACT_REQUEST', frameId } satisfies ExtensionMessage,
-        { frameId },
-      )
-      if (resp?.kind === 'EXTRACT_RESPONSE') snapshots.push(resp.snapshot as FrameSnapshot)
-    } catch { /* cross-origin iframe, skip */ }
+    const snap = await requestFrameSnapshot(tabId, frameId)
+    if (snap) snapshots.push(snap)
   }
 
+  if (!snapshots.some((s) => s.frameId === 0)) {
+    throw new Error('Could not read this page. Refresh the page and press Activate again.')
+  }
   return merge(snapshots)
+}
+
+async function requestFrameSnapshot(tabId: number, frameId: number): Promise<FrameSnapshot | null> {
+  const ask = async () => {
+    const resp = await chrome.tabs.sendMessage(
+      tabId,
+      { kind: 'EXTRACT_REQUEST', frameId } satisfies ExtensionMessage,
+      { frameId },
+    )
+    return resp?.kind === 'EXTRACT_RESPONSE' ? (resp.snapshot as FrameSnapshot) : null
+  }
+  try {
+    return await ask()
+  } catch {
+    // Tabs opened before the extension was (re)loaded have no live content
+    // script, so inject it on demand and retry once.
+    try {
+      await injectContentScript(tabId, frameId)
+      return await ask()
+    } catch {
+      return null // cross-origin or restricted frame
+    }
+  }
+}
+
+async function injectContentScript(tabId: number, frameId: number): Promise<void> {
+  const files = chrome.runtime.getManifest().content_scripts?.flatMap((cs) => cs.js ?? []) ?? []
+  if (!files.length) return
+  await chrome.scripting.executeScript({ target: { tabId, frameIds: [frameId] }, files })
 }
 
 function merge(frames: FrameSnapshot[]): PageSnapshot {

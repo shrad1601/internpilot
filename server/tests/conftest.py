@@ -6,8 +6,9 @@ from internpilot.main import app
 
 
 @pytest.fixture(autouse=True)
-def reset_auth():
-    """Isolate auth state for every test."""
+def reset_auth(tmp_path, monkeypatch):
+    """Isolate auth state (memory and token file) for every test."""
+    monkeypatch.setattr(auth, "TOKEN_PATH", tmp_path / ".token")
     auth.reset()
     yield
     auth.reset()
